@@ -1,10 +1,10 @@
-#include "common/operator/cast_operators.hpp"
+#include "duckdb/common/operator/cast_operators.hpp"
 
-#include "common/exception.hpp"
-#include "common/limits.hpp"
-#include "common/types/date.hpp"
-#include "common/types/time.hpp"
-#include "common/types/timestamp.hpp"
+#include "duckdb/common/exception.hpp"
+#include "duckdb/common/limits.hpp"
+#include "duckdb/common/types/date.hpp"
+#include "duckdb/common/types/time.hpp"
+#include "duckdb/common/types/timestamp.hpp"
 
 #include <cstdlib>
 #include <cctype>
@@ -409,14 +409,6 @@ template <> string CastFromDate::Operation(date_t left) {
 	return Date::ToString(left);
 }
 
-template <> int32_t CastFromDate::Operation(date_t left) {
-	return (int32_t)left;
-}
-
-template <> int64_t CastFromDate::Operation(date_t left) {
-	return (int64_t)left;
-}
-
 //===--------------------------------------------------------------------===//
 // Cast To Date
 //===--------------------------------------------------------------------===//
@@ -424,28 +416,11 @@ template <> date_t CastToDate::Operation(const char *left) {
 	return Date::FromCString(left);
 }
 
-template <> date_t CastToDate::Operation(int32_t left) {
-	return (date_t)left;
-}
-
-template <> date_t CastToDate::Operation(int64_t left) {
-	return (date_t)left;
-}
-
-
 //===--------------------------------------------------------------------===//
 // Cast From Time
 //===--------------------------------------------------------------------===//
 template <> string CastFromTime::Operation(dtime_t left) {
 	return Time::ToString(left);
-}
-
-template <> int32_t CastFromTime::Operation(dtime_t left) {
-	return (int32_t)left;
-}
-
-template <> int64_t CastFromTime::Operation(dtime_t left) {
-	return (int64_t)left;
 }
 
 //===--------------------------------------------------------------------===//
@@ -455,24 +430,23 @@ template <> dtime_t CastToTime::Operation(const char *left) {
 	return Time::FromCString(left);
 }
 
-template <> dtime_t CastToTime::Operation(int32_t left) {
-	return (dtime_t)left;
-}
-
-template <> dtime_t CastToTime::Operation(int64_t left) {
-	return (dtime_t)left;
+template <> timestamp_t CastDateToTimestamp::Operation(date_t input) {
+	return Timestamp::FromDatetime(input, Time::FromTime(0, 0, 0, 0));
 }
 
 //===--------------------------------------------------------------------===//
 // Cast From Timestamps
 //===--------------------------------------------------------------------===//
-
 template <> string CastFromTimestamp::Operation(timestamp_t left) {
 	return Timestamp::ToString(left);
 }
 
-template <> int64_t CastFromTimestamp::Operation(timestamp_t left) {
-	return (int64_t)left;
+template <> date_t CastTimestampToDate::Operation(timestamp_t left) {
+	return Timestamp::GetDate(left);
+}
+
+template <> dtime_t CastTimestampToTime::Operation(timestamp_t left) {
+	return Timestamp::GetTime(left);
 }
 
 //===--------------------------------------------------------------------===//
@@ -480,10 +454,6 @@ template <> int64_t CastFromTimestamp::Operation(timestamp_t left) {
 //===--------------------------------------------------------------------===//
 template <> timestamp_t CastToTimestamp::Operation(const char *left) {
 	return Timestamp::FromString(left);
-}
-
-template <> timestamp_t CastToTimestamp::Operation(int64_t left) {
-	return (timestamp_t)left;
 }
 
 } // namespace duckdb

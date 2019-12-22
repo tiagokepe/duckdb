@@ -1,8 +1,8 @@
-#include "function/scalar/string_functions.hpp"
+#include "duckdb/function/scalar/string_functions.hpp"
 
-#include "common/exception.hpp"
-#include "common/types/date.hpp"
-#include "common/vector_operations/vector_operations.hpp"
+#include "duckdb/common/exception.hpp"
+#include "duckdb/common/types/date.hpp"
+#include "duckdb/common/vector_operations/vector_operations.hpp"
 
 #include <string.h>
 
@@ -84,7 +84,7 @@ void concat_ws_function(ExpressionExecutor &exec, Vector inputs[], index_t input
 
 				// append the next input string
 				int input_length = strlen(input_chars[i]);
-				strncpy(output.get() + length_so_far, input_chars[i], input_length);
+				memcpy(output.get() + length_so_far, input_chars[i], sizeof(char) * input_length);
 				length_so_far += input_length;
 			}
 		}
@@ -93,8 +93,9 @@ void concat_ws_function(ExpressionExecutor &exec, Vector inputs[], index_t input
 	});
 }
 
-void ConcatWS::RegisterFunction(BuiltinFunctions &set) {
-	ScalarFunction concat_ws = ScalarFunction("concat_ws", { SQLType::VARCHAR, SQLType::VARCHAR }, SQLType::VARCHAR, concat_ws_function);
+void ConcatWSFun::RegisterFunction(BuiltinFunctions &set) {
+	ScalarFunction concat_ws =
+	    ScalarFunction("concat_ws", {SQLType::VARCHAR, SQLType::VARCHAR}, SQLType::VARCHAR, concat_ws_function);
 	concat_ws.varargs = SQLType::VARCHAR;
 	set.AddFunction(concat_ws);
 }

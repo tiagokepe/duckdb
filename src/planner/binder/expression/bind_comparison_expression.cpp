@@ -1,6 +1,6 @@
-#include "parser/expression/comparison_expression.hpp"
-#include "planner/expression/bound_comparison_expression.hpp"
-#include "planner/expression_binder.hpp"
+#include "duckdb/parser/expression/comparison_expression.hpp"
+#include "duckdb/planner/expression/bound_comparison_expression.hpp"
+#include "duckdb/planner/expression_binder.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -19,6 +19,15 @@ BindResult ExpressionBinder::BindExpression(ComparisonExpression &expr, index_t 
 	// cast the input types to the same type
 	// now obtain the result type of the input types
 	auto input_type = MaxSQLType(left.sql_type, right.sql_type);
+	if (input_type.id == SQLTypeId::VARCHAR) {
+		// for comparison with strings, we prefer to bind to the numeric types
+		if (left.sql_type.IsNumeric()) {
+			input_type = left.sql_type;
+		}
+		if (right.sql_type.IsNumeric()) {
+			input_type = right.sql_type;
+		}
+	}
 	if (input_type.id == SQLTypeId::UNKNOWN) {
 		throw BinderException("Could not determine type of parameters: try adding explicit type casts");
 	}

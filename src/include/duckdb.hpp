@@ -1,13 +1,13 @@
 //===----------------------------------------------------------------------===//
 //                         DuckDB
 //
-// duckdb.hpp
+// ../../../src/include/duckdb.hpp
 //
 //
 //===----------------------------------------------------------------------===//
 
 #pragma once
 
-#include "main/connection.hpp"
-#include "main/database.hpp"
-#include "main/query_result.hpp"
+#include "duckdb/main/connection.hpp"
+#include "duckdb/main/database.hpp"
+#include "duckdb/main/query_result.hpp"

@@ -1,7 +1,7 @@
 #include "catch.hpp"
-#include "common/operator/comparison_operators.hpp"
-#include "common/types/vector.hpp"
-#include "common/vector_operations/vector_operations.hpp"
+#include "duckdb/common/operator/comparison_operators.hpp"
+#include "duckdb/common/types/vector.hpp"
+#include "duckdb/common/vector_operations/vector_operations.hpp"
 
 #include <vector>
 
@@ -79,50 +79,6 @@ TEST_CASE("Aggregating numeric vectors", "[vector_ops]") {
 	require_aggrs(v);
 	v.Cast(TypeId::DOUBLE);
 	require_aggrs(v);
-}
-
-static void require_case(Vector &val) {
-	Vector check(TypeId::BOOLEAN, true, false);
-	check.count = val.count;
-	check.SetValue(0, Value::BOOLEAN(true));
-	check.SetValue(1, Value::BOOLEAN(false));
-	check.SetNull(2, true);
-
-	Vector v1(val.type, true, false);
-	Vector v2(val.type, true, false);
-	val.Copy(v1);
-	val.Copy(v2);
-
-	Vector res(val.type, true, false);
-	res.count = val.count;
-
-	VectorOperations::Case(check, v1, v2, res);
-
-	REQUIRE(res.GetValue(0) == val.GetValue(0));
-	REQUIRE(res.GetValue(1) == val.GetValue(1));
-	REQUIRE(res.GetValue(2).is_null);
-}
-
-TEST_CASE("Case vectors", "[vector_ops]") {
-	Vector v(TypeId::BOOLEAN, true, false);
-	v.count = 3;
-	v.SetValue(0, Value::BOOLEAN(true));
-	v.SetValue(1, Value::BOOLEAN(false));
-	v.SetNull(2, true);
-
-	require_case(v);
-	v.Cast(TypeId::SMALLINT);
-	require_case(v);
-	v.Cast(TypeId::INTEGER);
-	require_case(v);
-	v.Cast(TypeId::BIGINT);
-	require_case(v);
-	v.Cast(TypeId::FLOAT);
-	require_case(v);
-	v.Cast(TypeId::DOUBLE);
-	require_case(v);
-	v.Cast(TypeId::VARCHAR);
-	require_case(v);
 }
 
 static void require_compare(Vector &val) {
@@ -269,6 +225,8 @@ static void require_arith(TypeId t) {
 	Vector v2(t, true, false);
 	v2.count = v1.count;
 
+	// v1: 1, 2, 3, NULL, 42, NULL
+	// v2: 4, 5, 6, 7, NULL, NULL
 	v1.SetValue(0, Value::BIGINT(1));
 	v1.SetValue(1, Value::BIGINT(2));
 	v1.SetValue(2, Value::BIGINT(3));
@@ -333,42 +291,6 @@ static void require_arith(TypeId t) {
 	REQUIRE(r.GetValue(3).is_null);
 	REQUIRE(r.GetValue(4).is_null);
 	REQUIRE(r.GetValue(5).is_null);
-
-	Vector r2(t, true, false);
-	r2.count = v1.count;
-
-	Vector prec(TypeId::INTEGER, true, false);
-	prec.count = v1.count;
-	VectorOperations::Set(prec, Value::TINYINT(0));
-	VectorOperations::Divide(v2, v1, r);
-	VectorOperations::Round(r, prec, r2);
-
-	REQUIRE(r.GetValue(0).CastAs(TypeId::BIGINT) == Value::BIGINT(4));
-	REQUIRE(r.GetValue(1).CastAs(TypeId::BIGINT) == Value::BIGINT(2));
-	REQUIRE(r.GetValue(2).CastAs(TypeId::BIGINT) == Value::BIGINT(2));
-	REQUIRE(r.GetValue(3).is_null);
-	REQUIRE(r.GetValue(4).is_null);
-	REQUIRE(r.GetValue(5).is_null);
-
-	REQUIRE(r2.GetValue(0).CastAs(TypeId::BIGINT) == Value::BIGINT(4));
-	REQUIRE(r2.GetValue(1).CastAs(TypeId::BIGINT) == Value::BIGINT(2));
-	REQUIRE(r2.GetValue(2).CastAs(TypeId::BIGINT) == Value::BIGINT(2));
-	REQUIRE(r2.GetValue(3).is_null);
-	REQUIRE(r2.GetValue(4).is_null);
-	REQUIRE(r2.GetValue(5).is_null);
-
-	Vector m1(t, true, false);
-	m1.count = v1.count;
-	VectorOperations::Set(m1, Value::TINYINT(-1));
-	VectorOperations::Multiply(v1, m1, r);
-	VectorOperations::Abs(r, r2);
-
-	REQUIRE(r2.GetValue(0).CastAs(TypeId::BIGINT) == Value::BIGINT(1));
-	REQUIRE(r2.GetValue(1).CastAs(TypeId::BIGINT) == Value::BIGINT(2));
-	REQUIRE(r2.GetValue(2).CastAs(TypeId::BIGINT) == Value::BIGINT(3));
-	REQUIRE(r2.GetValue(3).is_null);
-	REQUIRE(r2.GetValue(4).CastAs(TypeId::BIGINT) == Value::BIGINT(42));
-	REQUIRE(r2.GetValue(5).is_null);
 }
 
 static void require_mod(TypeId t) {

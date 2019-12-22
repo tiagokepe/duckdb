@@ -1,8 +1,8 @@
-#include "function/scalar/string_functions.hpp"
+#include "duckdb/function/scalar/string_functions.hpp"
 
-#include "common/exception.hpp"
-#include "common/types/date.hpp"
-#include "common/vector_operations/vector_operations.hpp"
+#include "duckdb/common/exception.hpp"
+#include "duckdb/common/types/date.hpp"
+#include "duckdb/common/vector_operations/vector_operations.hpp"
 
 #include <string.h>
 
@@ -10,8 +10,8 @@ using namespace std;
 
 namespace duckdb {
 
-static void concat_function(ExpressionExecutor &exec, Vector inputs[], index_t input_count, BoundFunctionExpression &expr,
-                     Vector &result) {
+static void concat_function(ExpressionExecutor &exec, Vector inputs[], index_t input_count,
+                            BoundFunctionExpression &expr, Vector &result) {
 	assert(input_count >= 2 && input_count <= 64);
 
 	result.Initialize(TypeId::VARCHAR);
@@ -57,7 +57,7 @@ static void concat_function(ExpressionExecutor &exec, Vector inputs[], index_t i
 		int length_so_far = 0;
 		for (index_t i = 0; i < input_count; i++) {
 			int len = strlen(input_chars[i]);
-			strncpy(output.get() + length_so_far, input_chars[i], len);
+			memcpy(output.get() + length_so_far, input_chars[i], sizeof(char) * len);
 			length_so_far += len;
 		}
 		output[length_so_far] = '\0';
@@ -65,8 +65,9 @@ static void concat_function(ExpressionExecutor &exec, Vector inputs[], index_t i
 	});
 }
 
-void Concat::RegisterFunction(BuiltinFunctions &set) {
-	ScalarFunction concat = ScalarFunction("concat", { SQLType::VARCHAR, SQLType::VARCHAR }, SQLType::VARCHAR, concat_function);
+void ConcatFun::RegisterFunction(BuiltinFunctions &set) {
+	ScalarFunction concat =
+	    ScalarFunction("concat", {SQLType::VARCHAR, SQLType::VARCHAR}, SQLType::VARCHAR, concat_function);
 	concat.varargs = SQLType::VARCHAR;
 	set.AddFunction(concat);
 	concat.name = "||";

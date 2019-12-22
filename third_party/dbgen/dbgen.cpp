@@ -1,12 +1,12 @@
 #include "dbgen.hpp"
 
-#include "catalog/catalog_entry/table_catalog_entry.hpp"
-#include "common/exception.hpp"
-#include "common/types/date.hpp"
+#include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
+#include "duckdb/common/exception.hpp"
+#include "duckdb/common/types/date.hpp"
 #include "dbgen_gunk.hpp"
-#include "main/client_context.hpp"
-#include "parser/column_definition.hpp"
-#include "storage/data_table.hpp"
+#include "duckdb/main/client_context.hpp"
+#include "duckdb/parser/column_definition.hpp"
+#include "duckdb/storage/data_table.hpp"
 #include "tpch_constants.hpp"
 
 #define DECLARER /* EXTERN references get defined here */
@@ -85,9 +85,6 @@ static void append_to_append_info(tpch_append_information &info) {
 
 static void append_order(order_t *o, tpch_append_information *info) {
 	auto &append_info = info[ORDER];
-	if (!append_info.table) {
-		return;
-	}
 	auto &chunk = append_info.chunk;
 	append_to_append_info(append_info);
 	size_t index = chunk.size() - 1;
@@ -464,19 +461,18 @@ static string LineitemSchema(string schema, string suffix) {
 	       "l_comment VARCHAR(44) NOT NULL)";
 }
 
-void dbgen(double flt_scale, DuckDB &db, string schema, string suffix, bool only_lineitem) {
+void dbgen(double flt_scale, DuckDB &db, string schema, string suffix) {
+	unique_ptr<QueryResult> result;
 	Connection con(db);
 	con.Query("BEGIN TRANSACTION");
 
-	if (!only_lineitem) {
-		con.Query(RegionSchema(schema, suffix));
-		con.Query(NationSchema(schema, suffix));
-		con.Query(SupplierSchema(schema, suffix));
-		con.Query(CustomerSchema(schema, suffix));
-		con.Query(PartSchema(schema, suffix));
-		con.Query(PartSuppSchema(schema, suffix));
-		con.Query(OrdersSchema(schema, suffix));
-	}
+	con.Query(RegionSchema(schema, suffix));
+	con.Query(NationSchema(schema, suffix));
+	con.Query(SupplierSchema(schema, suffix));
+	con.Query(CustomerSchema(schema, suffix));
+	con.Query(PartSchema(schema, suffix));
+	con.Query(PartSuppSchema(schema, suffix));
+	con.Query(OrdersSchema(schema, suffix));
 	con.Query(LineitemSchema(schema, suffix));
 
 	if (flt_scale == 0) {
@@ -489,11 +485,7 @@ void dbgen(double flt_scale, DuckDB &db, string schema, string suffix, bool only
 	DSS_HUGE rowcnt = 0;
 	DSS_HUGE i;
 	// all tables
-	if (!only_lineitem) {
-		table = (1 << CUST) | (1 << SUPP) | (1 << NATION) | (1 << REGION) | (1 << PART_PSUPP) | (1 << ORDER_LINE);
-	} else {
-		table = (1 << ORDER_LINE);
-	}
+	table = (1 << CUST) | (1 << SUPP) | (1 << NATION) | (1 << REGION) | (1 << PART_PSUPP) | (1 << ORDER_LINE);
 	force = 0;
 	insert_segments = 0;
 	delete_segments = 0;
@@ -549,24 +541,18 @@ void dbgen(double flt_scale, DuckDB &db, string schema, string suffix, bool only
 	tdefs[NATION].base = nations.count;
 	tdefs[REGION].base = regions.count;
 
-
-
-	auto append_info = unique_ptr<tpch_append_information[]>(new tpch_append_information[MAX_TABLE]);
-	for (i = PART; i < MAX_TABLE; i++) {
-		append_info[i].table = nullptr;
+	auto append_info = unique_ptr<tpch_append_information[]>(new tpch_append_information[REGION + 1]);
+	memset(append_info.get(), 0, sizeof(tpch_append_information) * REGION + 1);
+	for (size_t i = PART; i <= REGION; i++) {
 		auto tname = get_table_name(i);
 		if (!tname.empty()) {
-			try {
-				append_info[i].table = db.catalog->GetTable(con.context->ActiveTransaction(), schema, tname + suffix);
-			} catch(...) {/*whatever*/}
+			append_info[i].table = db.catalog->GetTable(*con.context, schema, tname + suffix);
 		}
 		append_info[i].context = con.context.get();
 	}
 
-	for (i = PART; i < MAX_TABLE; i++) {
-		if (!(table & (1 << i))) {
-			continue;
-		}
+	for (i = PART; i <= REGION; i++) {
+		if (table & (1 << i)) {
 			if (i < NATION) {
 				rowcnt = tdefs[i].base * scale;
 			} else {
@@ -574,10 +560,10 @@ void dbgen(double flt_scale, DuckDB &db, string schema, string suffix, bool only
 			}
 			// actually doing something
 			gen_tbl((int)i, rowcnt, append_info.get());
-
+		}
 	}
 	// flush any incomplete chunks
-	for (size_t i = PART; i < MAX_TABLE; i++) {
+	for (size_t i = PART; i <= REGION; i++) {
 		if (append_info[i].table) {
 			if (append_info[i].chunk.size() > 0) {
 				append_info[i].table->storage->Append(*append_info[i].table, *append_info[i].context,

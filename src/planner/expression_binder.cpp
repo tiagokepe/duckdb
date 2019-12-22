@@ -1,16 +1,16 @@
-#include "planner/expression_binder.hpp"
+#include "duckdb/planner/expression_binder.hpp"
 
-#include "main/client_context.hpp"
-#include "main/database.hpp"
-#include "parser/expression/columnref_expression.hpp"
-#include "parser/expression/subquery_expression.hpp"
-#include "parser/parsed_expression_iterator.hpp"
-#include "planner/binder.hpp"
-#include "planner/expression/bound_cast_expression.hpp"
-#include "planner/expression/bound_default_expression.hpp"
-#include "planner/expression/bound_parameter_expression.hpp"
-#include "planner/expression/bound_subquery_expression.hpp"
-#include "planner/expression_iterator.hpp"
+#include "duckdb/main/client_context.hpp"
+#include "duckdb/main/database.hpp"
+#include "duckdb/parser/expression/columnref_expression.hpp"
+#include "duckdb/parser/expression/subquery_expression.hpp"
+#include "duckdb/parser/parsed_expression_iterator.hpp"
+#include "duckdb/planner/binder.hpp"
+#include "duckdb/planner/expression/bound_cast_expression.hpp"
+#include "duckdb/planner/expression/bound_default_expression.hpp"
+#include "duckdb/planner/expression/bound_parameter_expression.hpp"
+#include "duckdb/planner/expression/bound_subquery_expression.hpp"
+#include "duckdb/planner/expression_iterator.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -71,6 +71,7 @@ bool ExpressionBinder::BindCorrelatedColumns(unique_ptr<ParsedExpression> &expr)
 	bool success = false;
 	while (active_binders.size() > 0) {
 		auto &next_binder = active_binders.back();
+		next_binder->BindTableNames(*expr);
 		auto bind_result = next_binder->Bind(&expr, depth);
 		if (bind_result.empty()) {
 			success = true;
@@ -149,7 +150,7 @@ string ExpressionBinder::Bind(unique_ptr<ParsedExpression> *expr, index_t depth,
 		return result.error;
 	} else {
 		// successfully bound: replace the node with a BoundExpression
-		*expr = make_unique<BoundExpression>(move(result.expression), result.sql_type);
+		*expr = make_unique<BoundExpression>(move(result.expression), move(*expr), result.sql_type);
 		return string();
 	}
 }

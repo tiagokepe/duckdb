@@ -1,20 +1,19 @@
-#include "optimizer/optimizer.hpp"
+#include "duckdb/optimizer/optimizer.hpp"
 
-#include "execution/expression_executor.hpp"
-#include "main/client_context.hpp"
-#include "optimizer/ca_optimizer.hpp"
-#include "optimizer/cse_optimizer.hpp"
-#include "optimizer/filter_pushdown.hpp"
-#include "optimizer/index_scan.hpp"
-#include "optimizer/join_order_optimizer.hpp"
-#include "optimizer/regex_range_filter.hpp"
-#include "optimizer/rule/list.hpp"
-#include "optimizer/topn_optimizer.hpp"
-#include "planner/binder.hpp"
-#include "planner/expression/bound_columnref_expression.hpp"
-#include "planner/expression/bound_operator_expression.hpp"
-#include "planner/expression/common_subexpression.hpp"
-#include "planner/operator/list.hpp"
+#include "duckdb/execution/expression_executor.hpp"
+#include "duckdb/main/client_context.hpp"
+#include "duckdb/optimizer/cse_optimizer.hpp"
+#include "duckdb/optimizer/filter_pushdown.hpp"
+#include "duckdb/optimizer/index_scan.hpp"
+#include "duckdb/optimizer/join_order_optimizer.hpp"
+#include "duckdb/optimizer/regex_range_filter.hpp"
+#include "duckdb/optimizer/rule/list.hpp"
+#include "duckdb/optimizer/topn_optimizer.hpp"
+#include "duckdb/planner/binder.hpp"
+#include "duckdb/planner/expression/bound_columnref_expression.hpp"
+#include "duckdb/planner/expression/bound_operator_expression.hpp"
+#include "duckdb/planner/expression/common_subexpression.hpp"
+#include "duckdb/planner/operator/list.hpp"
 
 using namespace duckdb;
 using namespace std;
@@ -94,11 +93,6 @@ unique_ptr<LogicalOperator> Optimizer::Optimize(unique_ptr<LogicalOperator> plan
 	JoinOrderOptimizer optimizer;
 	plan = optimizer.Optimize(move(plan));
 	context.profiler.EndPhase();
-	// next we make sure that multiple occurences of the same aggregation are only computed once
-	// context.profiler.StartPhase("common_aggregate_expressions");
-	// CommonAggregateOptimizer ca_optimizer;
-	// ca_optimizer.VisitOperator(*plan);
-	// context.profiler.EndPhase();
 
 	// then we extract common subexpressions inside the different operators
 	// context.profiler.StartPhase("common_subexpressions");
