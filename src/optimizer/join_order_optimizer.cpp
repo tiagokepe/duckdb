@@ -45,13 +45,6 @@ bool JoinOrderOptimizer::ExtractBindings(Expression &expression, unordered_set<i
 	return can_reorder;
 }
 
-static void ExtractFilters(LogicalOperator *op, vector<unique_ptr<Expression>> &filters) {
-	for (index_t i = 0; i < op->expressions.size(); i++) {
-		filters.push_back(move(op->expressions[i]));
-	}
-	op->expressions.clear();
-}
-
 static unique_ptr<LogicalOperator> PushFilter(unique_ptr<LogicalOperator> node, unique_ptr<Expression> expr) {
 	// push an expression into a filter
 	// first check if we have any filter to push it into
@@ -71,8 +64,7 @@ static unique_ptr<LogicalOperator> PushFilter(unique_ptr<LogicalOperator> node, 
 bool JoinOrderOptimizer::ExtractJoinRelations(LogicalOperator &input_op, vector<LogicalOperator *> &filter_operators,
                                               LogicalOperator *parent) {
 	LogicalOperator *op = &input_op;
-	while (op->children.size() == 1 && op->type != LogicalOperatorType::SUBQUERY &&
-	       op->type != LogicalOperatorType::PROJECTION) {
+	while (op->children.size() == 1 && op->type != LogicalOperatorType::PROJECTION) {
 		if (op->type == LogicalOperatorType::FILTER) {
 			// extract join conditions from filter
 			filter_operators.push_back(op);
@@ -95,7 +87,7 @@ bool JoinOrderOptimizer::ExtractJoinRelations(LogicalOperator &input_op, vector<
 
 	if (op->type == LogicalOperatorType::COMPARISON_JOIN) {
 		LogicalJoin *join = (LogicalJoin *)op;
-		if (join->type == JoinType::INNER) {
+		if (join->join_type == JoinType::INNER) {
 			// extract join conditions from inner join
 			filter_operators.push_back(op);
 		} else {
@@ -139,17 +131,6 @@ bool JoinOrderOptimizer::ExtractJoinRelations(LogicalOperator &input_op, vector<
 		auto get = (LogicalGet *)op;
 		auto relation = make_unique<Relation>(&input_op, parent);
 		relation_mapping[get->table_index] = relations.size();
-		relations.push_back(move(relation));
-		return true;
-	} else if (op->type == LogicalOperatorType::SUBQUERY) {
-		auto subquery = (LogicalSubquery *)op;
-		assert(op->children.size() == 1);
-		// we run the join order optimizer witin the subquery as well
-		JoinOrderOptimizer optimizer;
-		op->children[0] = optimizer.Optimize(move(op->children[0]));
-		// now we add the subquery to the set of relations
-		auto relation = make_unique<Relation>(&input_op, parent);
-		relation_mapping[subquery->table_index] = relations.size();
 		relations.push_back(move(relation));
 		return true;
 	} else if (op->type == LogicalOperatorType::TABLE_FUNCTION) {
@@ -650,19 +631,31 @@ unique_ptr<LogicalOperator> JoinOrderOptimizer::Optimize(unique_ptr<LogicalOpera
 		// at most one relation, nothing to reorder
 		return plan;
 	}
-	// now that we know we are going to perform join ordering we actually extract the filters
+	// now that we know we are going to perform join ordering we actually extract the filters, eliminating duplicate
+	// filters in the process
+	expression_set_t filter_set;
 	for (auto &op : filter_operators) {
 		if (op->type == LogicalOperatorType::COMPARISON_JOIN) {
 			auto &join = (LogicalComparisonJoin &)*op;
-			assert(join.type == JoinType::INNER);
+			assert(join.join_type == JoinType::INNER);
 			assert(join.expressions.size() == 0);
 			for (auto &cond : join.conditions) {
-				filters.push_back(
-				    make_unique<BoundComparisonExpression>(cond.comparison, move(cond.left), move(cond.right)));
+				auto comparison =
+				    make_unique<BoundComparisonExpression>(cond.comparison, move(cond.left), move(cond.right));
+				if (filter_set.find(comparison.get()) == filter_set.end()) {
+					filter_set.insert(comparison.get());
+					filters.push_back(move(comparison));
+				}
 			}
 			join.conditions.clear();
 		} else {
-			ExtractFilters(op, filters);
+			for (index_t i = 0; i < op->expressions.size(); i++) {
+				if (filter_set.find(op->expressions[i].get()) == filter_set.end()) {
+					filter_set.insert(op->expressions[i].get());
+					filters.push_back(move(op->expressions[i]));
+				}
+			}
+			op->expressions.clear();
 		}
 	}
 	// create potential edges from the comparisons

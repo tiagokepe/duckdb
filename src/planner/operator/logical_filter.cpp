@@ -14,7 +14,11 @@ LogicalFilter::LogicalFilter() : LogicalOperator(LogicalOperatorType::FILTER) {
 }
 
 void LogicalFilter::ResolveTypes() {
-	types = children[0]->types;
+	types = MapTypes(children[0]->types, projection_map);
+}
+
+vector<ColumnBinding> LogicalFilter::GetColumnBindings() {
+	return MapBindings(children[0]->GetColumnBindings(), projection_map);
 }
 
 // Split the predicates separated by AND statements
@@ -26,9 +30,12 @@ bool LogicalFilter::SplitPredicates(vector<unique_ptr<Expression>> &expressions)
 		if (expressions[i]->type == ExpressionType::CONJUNCTION_AND) {
 			auto &conjunction = (BoundConjunctionExpression &)*expressions[i];
 			found_conjunction = true;
-			// AND expression, split into left and right child
-			expressions.push_back(move(conjunction.left));
-			expressions[i] = move(conjunction.right);
+			// AND expression, append the other children
+			for (index_t k = 1; k < conjunction.children.size(); k++) {
+				expressions.push_back(move(conjunction.children[k]));
+			}
+			// replace this expression with the first child of the conjunction
+			expressions[i] = move(conjunction.children[0]);
 			// we move back by one so the right child is checked again
 			// in case it is an AND expression as well
 			i--;

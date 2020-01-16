@@ -137,7 +137,6 @@ template class std::unique_ptr<Vector[]>;
 template class std::unique_ptr<DataChunk>;
 template class std::unique_ptr<JoinHashTable>;
 template class std::unique_ptr<JoinHashTable::ScanStructure>;
-template class std::unique_ptr<JoinHashTable::Node>;
 template class std::unique_ptr<data_ptr_t[]>;
 template class std::unique_ptr<Rule>;
 template class std::unique_ptr<LogicalFilter>;
@@ -160,7 +159,6 @@ template class std::unique_ptr<Binder>;
 	template VECTOR_DEFINITION::const_reference VECTOR_DEFINITION::front() const;                                      \
 	template VECTOR_DEFINITION::reference VECTOR_DEFINITION::front();
 
-template class std::vector<BoundTable>;
 INSTANTIATE_VECTOR(std::vector<ColumnDefinition>);
 template class std::vector<ExpressionType>;
 INSTANTIATE_VECTOR(std::vector<JoinCondition>);
