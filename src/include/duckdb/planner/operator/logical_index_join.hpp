@@ -1,0 +1,49 @@
+//===----------------------------------------------------------------------===//
+//                         DuckDB
+//
+// duckdb/planner/operator/LogicalIndexJoin.hpp
+//
+//
+//===----------------------------------------------------------------------===//
+
+#pragma once
+
+#include "duckdb/common/enums/join_type.hpp"
+#include "duckdb/common/unordered_set.hpp"
+#include "duckdb/planner/logical_operator.hpp"
+
+namespace duckdb {
+
+//! LogicalIndexJoin represents a join between two relations when RHS has an index on the join key
+    class LogicalIndexJoin : public LogicalOperator {
+    public:
+        LogicalIndexJoin(JoinType type, LogicalOperatorType logical_type = LogicalOperatorType::JOIN);
+
+        // Gets the set of table references that are reachable from this node
+        static void GetTableReferences(LogicalOperator &op, unordered_set<index_t> &bindings);
+        static void GetExpressionBindings(Expression &expr, unordered_set<index_t> &bindings);
+
+        //! The type of the join (INNER, OUTER, etc...)
+        JoinType join_type;
+        //! Table index used to refer to the MARK column (in case of a MARK join)
+        index_t mark_index;
+        //! The columns of the LHS that are output by the join
+        vector<index_t> left_projection_map;
+        //! The columns of the RHS that are output by the join
+        vector<index_t> right_projection_map;
+
+        //! The table to scan
+        TableCatalogEntry &tableref;
+        //! The physical data table to scan
+        DataTable &table;
+        //! The index to use for the RHS
+        Index &index_rhs;
+
+    public:
+        vector<ColumnBinding> GetColumnBindings() override;
+
+    protected:
+        void ResolveTypes() override;
+    };
+
+} // namespace duckdb

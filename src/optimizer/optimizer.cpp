@@ -6,6 +6,7 @@
 #include "duckdb/optimizer/expression_heuristics.hpp"
 #include "duckdb/optimizer/filter_pushdown.hpp"
 #include "duckdb/optimizer/index_scan.hpp"
+#include "duckdb/optimizer/index_join.hpp"
 #include "duckdb/optimizer/join_order_optimizer.hpp"
 #include "duckdb/optimizer/regex_range_filter.hpp"
 #include "duckdb/optimizer/column_lifetime_optimizer.hpp"
@@ -102,6 +103,13 @@ unique_ptr<LogicalOperator> Optimizer::Optimize(unique_ptr<LogicalOperator> plan
 	JoinOrderOptimizer optimizer;
 	plan = optimizer.Optimize(move(plan));
 	context.profiler.EndPhase();
+
+    // Now we check if there are any equality joins + scan with indexes in their RHS key
+    // if yes we rewrite it to a index_join node.
+    context.profiler.StartPhase("index_join");
+    IndexJoin index_join;
+    plan = index_join.Optimize(move(plan));
+    context.profiler.EndPhase();
 
 	// then we extract common subexpressions inside the different operators
 	// context.profiler.StartPhase("common_subexpressions");
