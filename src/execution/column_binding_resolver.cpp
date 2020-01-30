@@ -16,7 +16,8 @@ ColumnBindingResolver::ColumnBindingResolver() {
 }
 
 void ColumnBindingResolver::VisitOperator(LogicalOperator &op) {
-	if (op.type == LogicalOperatorType::COMPARISON_JOIN || op.type == LogicalOperatorType::DELIM_JOIN) {
+	if (op.type == LogicalOperatorType::COMPARISON_JOIN || op.type == LogicalOperatorType::DELIM_JOIN ||
+	    op.type == LogicalOperatorType::INDEX_JOIN) {
 		// special case: comparison join
 		auto &comp_join = (LogicalComparisonJoin &)op;
 		// first get the bindings of the LHS and resolve the LHS expressions

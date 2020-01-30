@@ -28,6 +28,7 @@ class LogicalExpressionGet;
 class LogicalFilter;
 class LogicalGet;
 class LogicalIndexScan;
+class LogicalIndexJoin;
 class LogicalJoin;
 class LogicalLimit;
 class LogicalOrder;

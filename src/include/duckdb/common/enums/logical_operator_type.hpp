@@ -45,6 +45,7 @@ enum class LogicalOperatorType : uint8_t {
 	COMPARISON_JOIN,
 	ANY_JOIN,
 	CROSS_PRODUCT,
+	INDEX_JOIN,
 	// -----------------------------
 	// SetOps
 	// -----------------------------

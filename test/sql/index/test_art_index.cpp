@@ -1498,8 +1498,6 @@ TEST_CASE("ART FP Unique Constraint", "[art-float-unique]") {
 	REQUIRE_FAIL(con.Query("UPDATE numbers SET i=NULL;"));
 }
 
-
-
 TEST_CASE("ART FP Special Cases", "[art-fp-special]") {
 	unique_ptr<QueryResult> result;
 	DuckDB db(nullptr);

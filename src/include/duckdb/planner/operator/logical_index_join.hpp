@@ -1,7 +1,7 @@
 //===----------------------------------------------------------------------===//
 //                         DuckDB
 //
-// duckdb/planner/operator/LogicalIndexJoin.hpp
+// duckdb/planner/operator/logical_index_join.hpp
 //
 //
 //===----------------------------------------------------------------------===//
@@ -15,35 +15,50 @@
 namespace duckdb {
 
 //! LogicalIndexJoin represents a join between two relations when RHS has an index on the join key
-    class LogicalIndexJoin : public LogicalOperator {
-    public:
-        LogicalIndexJoin(JoinType type, LogicalOperatorType logical_type = LogicalOperatorType::JOIN);
+class LogicalIndexJoin : public LogicalJoin {
+public:
+	LogicalIndexJoin(JoinType type, vector<index_t> left_projection_map, vector<index_t> right_projection_map,
+	                 TableCatalogEntry &tableref, DataTable &table, Index &index, vector<column_t> column_ids,
+	                 index_t table_index)
+	    : LogicalJoin(type, LogicalOperatorType::INDEX_JOIN), left_projection_map(left_projection_map),
+	      right_projection_map(right_projection_map), tableref(tableref), table(table), index(index),
+	      column_ids(column_ids), table_index(table_index){};
 
-        // Gets the set of table references that are reachable from this node
-        static void GetTableReferences(LogicalOperator &op, unordered_set<index_t> &bindings);
-        static void GetExpressionBindings(Expression &expr, unordered_set<index_t> &bindings);
+	//! The conditions of the join
+	vector<JoinCondition> conditions;
+	//! The table to scan
+	TableCatalogEntry &tableref;
+	//! The physical data table to scan
+	DataTable &table;
+	//! The index to use for the scan
+	Index &index;
+	//! The column ids to project
+	vector<column_t> column_ids;
+	//! The value for the query predicate
+	Value low_value;
+	Value high_value;
+	Value equal_value;
 
-        //! The type of the join (INNER, OUTER, etc...)
-        JoinType join_type;
-        //! Table index used to refer to the MARK column (in case of a MARK join)
-        index_t mark_index;
-        //! The columns of the LHS that are output by the join
-        vector<index_t> left_projection_map;
-        //! The columns of the RHS that are output by the join
-        vector<index_t> right_projection_map;
+	//! If the predicate is low, high or equal
+	bool low_index = false;
+	bool high_index = false;
+	bool equal_index = false;
 
-        //! The table to scan
-        TableCatalogEntry &tableref;
-        //! The physical data table to scan
-        DataTable &table;
-        //! The index to use for the RHS
-        Index &index_rhs;
+	//! The expression type (e.g., >, <, >=, <=)
+	ExpressionType low_expression_type;
+	ExpressionType high_expression_type;
 
-    public:
-        vector<ColumnBinding> GetColumnBindings() override;
+	//! The table index in the current bind context
+	index_t table_index;
 
-    protected:
-        void ResolveTypes() override;
-    };
+protected:
+	void ResolveTypes() override {
+		if (column_ids.size() == 0) {
+			types = {TypeId::INTEGER};
+		} else {
+			types = tableref.GetTypes(column_ids);
+		}
+	}
+};
 
 } // namespace duckdb

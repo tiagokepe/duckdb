@@ -126,7 +126,7 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalOperator &
 	case LogicalOperatorType::DROP:
 	case LogicalOperatorType::PRAGMA:
 		return CreatePlan((LogicalSimple &)op);
-	default:
+	case LogicalOperatorType::INDEX_JOIN return CreatePlan((LogicalIndexJoin &)op); default:
 		throw NotImplementedException("Unimplemented logical operator type!");
 	}
 }
