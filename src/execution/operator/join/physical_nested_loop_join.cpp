@@ -38,7 +38,7 @@ PhysicalNestedLoopJoin::PhysicalNestedLoopJoin(LogicalOperator &op, unique_ptr<P
 }
 
 //! Remove NULL values from a chunk; returns true if the chunk had NULL values
-static bool RemoveNullValues(DataChunk &chunk) {
+bool PhysicalNestedLoopJoin::RemoveNullValues(DataChunk &chunk) {
 	// OR all nullmasks together
 	nullmask_t nullmask = chunk.data[0].nullmask;
 	for (index_t i = 1; i < chunk.column_count; i++) {
@@ -166,7 +166,7 @@ void PhysicalNestedLoopJoin::GetChunkInternal(ClientContext &context, DataChunk 
 	// now that we have fully materialized the right child
 	// we have to perform the nested loop join
 	do {
-		// first check if we have to move to the next child on the right isde
+		// first check if we have to move to the next child on the right side
 		assert(state->right_chunk < state->right_chunks.chunks.size());
 		if (state->right_tuple >= state->right_chunks.chunks[state->right_chunk]->size()) {
 			// we exhausted the chunk on the right

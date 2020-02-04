@@ -4,6 +4,8 @@ add_subdirectory(nested_loop_join)
 add_subdirectory(operator)
 add_subdirectory(physical_plan)
 add_subdirectory(index/art)
+add_subdirectory(index_join)
+
 
 add_library(duckdb_execution OBJECT
             aggregate_hashtable.cpp

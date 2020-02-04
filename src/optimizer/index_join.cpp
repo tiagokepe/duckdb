@@ -53,7 +53,6 @@ unique_ptr<LogicalOperator> IndexJoin::TransformJoinToIndexJoin(unique_ptr<Logic
 	for (size_t j = 0; j < storage.indexes.size(); j++) {
 		auto &index = storage.indexes[j];
 
-		//		assert(index->unbound_expressions.size() == 1);
 		// first rewrite the index expression so the ColumnBindings align with the column bindings of the current table
 		if (index->unbound_expressions.size() > 1)
 			continue;
@@ -69,15 +68,16 @@ unique_ptr<LogicalOperator> IndexJoin::TransformJoinToIndexJoin(unique_ptr<Logic
 		// try to find a matching index for any of the filter expressions
 
 		// FIXME: Right now I only check the LHS for the join key
-		auto expr = (BoundColumnRefExpression *)join.conditions[0].left.get();
+        //FIXME: Might need to swap conditions in the optimizer
+
+        auto expr = (BoundColumnRefExpression *)join.conditions[0].left.get();
 		auto idx_bindings = (BoundColumnRefExpression *)index_expression.get();
 		// Its a match
 		if (expr->binding.table_index == idx_bindings->binding.table_index &&
 		    expr->binding.column_index == idx_bindings->binding.column_index) {
 			auto logical_index_join = make_unique<LogicalIndexJoin>(
-			    join.join_type, join.left_projection_map, join.right_projection_map, *get->table, *get->table->storage,
+			    join.join_type, join.left_projection_map, join.right_projection_map,join.conditions, *get->table, *get->table->storage,
 			    *index, get->column_ids, get->table_index);
-			logical_index_join->children.push_back(move(join.children[0]));
 			logical_index_join->children.push_back(move(join.children[1]));
 			op = move(logical_index_join);
 		}

@@ -3,10 +3,10 @@
 #include "duckdb/planner/operator/logical_comparison_join.hpp"
 #include "duckdb/planner/operator/logical_create_index.hpp"
 #include "duckdb/planner/operator/logical_delim_join.hpp"
+#include "duckdb/planner/operator/logical_index_join.hpp"
 
 #include "duckdb/planner/expression/bound_columnref_expression.hpp"
 #include "duckdb/planner/expression/bound_reference_expression.hpp"
-
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 
 using namespace duckdb;
@@ -16,8 +16,7 @@ ColumnBindingResolver::ColumnBindingResolver() {
 }
 
 void ColumnBindingResolver::VisitOperator(LogicalOperator &op) {
-	if (op.type == LogicalOperatorType::COMPARISON_JOIN || op.type == LogicalOperatorType::DELIM_JOIN ||
-	    op.type == LogicalOperatorType::INDEX_JOIN) {
+	if (op.type == LogicalOperatorType::COMPARISON_JOIN || op.type == LogicalOperatorType::DELIM_JOIN ) {
 		// special case: comparison join
 		auto &comp_join = (LogicalComparisonJoin &)op;
 		// first get the bindings of the LHS and resolve the LHS expressions
@@ -32,14 +31,23 @@ void ColumnBindingResolver::VisitOperator(LogicalOperator &op) {
 				VisitExpression(&expr);
 			}
 		}
-		// then get the bindings of the RHS and resolve the RHS expressions
-		VisitOperator(*comp_join.children[1]);
-		for (auto &cond : comp_join.conditions) {
-			VisitExpression(&cond.right);
-		}
+        // then get the bindings of the RHS and resolve the RHS expressions
+        VisitOperator(*comp_join.children[1]);
+        for (auto &cond : comp_join.conditions) {
+            VisitExpression(&cond.right);
+        }
 		// finally update the bindings with the result bindings of the join
 		bindings = op.GetColumnBindings();
 		return;
+	} else if (op.type == LogicalOperatorType::INDEX_JOIN){
+	    auto &idx_join = (LogicalIndexJoin &)op;
+        VisitOperator(*idx_join.children[0]);
+        VisitOperatorExpressions(op);
+        bindings = op.GetColumnBindings();
+        for (auto &cond : idx_join.conditions) {
+            VisitExpression(&cond.left);
+        }
+        return;
 	} else if (op.type == LogicalOperatorType::ANY_JOIN) {
 		// ANY join, this join is different because we evaluate the expression on the bindings of BOTH join sides at
 		// once i.e. we set the bindings first to the bindings of the entire join, and then resolve the expressions of
@@ -48,7 +56,8 @@ void ColumnBindingResolver::VisitOperator(LogicalOperator &op) {
 		bindings = op.GetColumnBindings();
 		VisitOperatorExpressions(op);
 		return;
-	} else if (op.type == LogicalOperatorType::CREATE_INDEX) {
+	}
+	else if (op.type == LogicalOperatorType::CREATE_INDEX) {
 		// CREATE INDEX statement, add the columns of the table with table index 0 to the binding set
 		// afterwards bind the expressions of the CREATE INDEX statement
 		auto &create_index = (LogicalCreateIndex &)op;

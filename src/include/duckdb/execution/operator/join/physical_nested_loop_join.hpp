@@ -23,6 +23,7 @@ class PhysicalNestedLoopJoin : public PhysicalComparisonJoin {
 public:
 	PhysicalNestedLoopJoin(LogicalOperator &op, unique_ptr<PhysicalOperator> left, unique_ptr<PhysicalOperator> right,
 	                       vector<JoinCondition> cond, JoinType join_type);
+    static bool RemoveNullValues(DataChunk &chunk);
 
 public:
 	void GetChunkInternal(ClientContext &context, DataChunk &chunk, PhysicalOperatorState *state) override;
