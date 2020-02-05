@@ -32,7 +32,8 @@ add_library_unity(duckdb_physical_plan
                   plan_update.cpp
                   plan_window.cpp
                   plan_expression_get.cpp
-                  plan_index_join.cpp)
+                  plan_index_join.cpp
+                  plan_recursive_cte.cpp)
 set(ALL_OBJECT_FILES
     ${ALL_OBJECT_FILES} $<TARGET_OBJECTS:duckdb_physical_plan>
     PARENT_SCOPE)

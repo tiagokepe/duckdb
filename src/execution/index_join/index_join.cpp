@@ -10,8 +10,8 @@ struct InitialIndexJoin {
 	                         sel_t rvector[], index_t current_match_count) {
 		// initialize phase of nested loop join
 		// fill lvector and rvector with matches from the base vectors
-		auto ldata = (T *)left.data;
-		auto rdata = (T *)right.data;
+		auto ldata = (T *)left.GetData();
+		auto rdata = (T *)right.GetData();
 		index_t result_count = 0;
 		for (; rpos < right.count; rpos++) {
 			index_t right_position = right.sel_vector ? right.sel_vector[rpos] : rpos;
@@ -41,14 +41,14 @@ template <class NLTYPE, class OP>
 static index_t index_join_inner_operator(Vector &left, Vector &right, index_t &lpos, index_t &rpos,
                                                sel_t lvector[], sel_t rvector[], index_t current_match_count) {
 	switch (left.type) {
-	case TypeId::BOOLEAN:
-	case TypeId::TINYINT:
+	case TypeId::BOOL:
+	case TypeId::INT8:
 		return NLTYPE::template Operation<int8_t, OP>(left, right, lpos, rpos, lvector, rvector, current_match_count);
-	case TypeId::SMALLINT:
+	case TypeId::INT16:
 		return NLTYPE::template Operation<int16_t, OP>(left, right, lpos, rpos, lvector, rvector, current_match_count);
-	case TypeId::INTEGER:
+	case TypeId::INT32:
 		return NLTYPE::template Operation<int32_t, OP>(left, right, lpos, rpos, lvector, rvector, current_match_count);
-	case TypeId::BIGINT:
+	case TypeId::INT64:
 		return NLTYPE::template Operation<int64_t, OP>(left, right, lpos, rpos, lvector, rvector, current_match_count);
 	case TypeId::FLOAT:
 		return NLTYPE::template Operation<float, OP>(left, right, lpos, rpos, lvector, rvector, current_match_count);

@@ -58,6 +58,7 @@ enum class PhysicalOperatorType : uint8_t {
 	// SetOps
 	// -----------------------------
 	UNION,
+	RECURSIVE_CTE,
 
 	// -----------------------------
 	// Updates

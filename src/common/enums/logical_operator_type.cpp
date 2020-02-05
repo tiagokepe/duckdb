@@ -75,8 +75,12 @@ string LogicalOperatorToString(LogicalOperatorType type) {
 		return "EXECUTE";
 	case LogicalOperatorType::INDEX_SCAN:
 		return "INDEX_SCAN";
-	case LogicalOperatorType::INDEX_JOIN:
-		return "INDEX_JOIN";
+    case LogicalOperatorType::RECURSIVE_CTE:
+        return "REC_CTE";
+    case LogicalOperatorType::CTE_REF:
+        return "CTE_SCAN";
+    case LogicalOperatorType::INDEX_JOIN:
+        return "INDEX_JOIN";
 	case LogicalOperatorType::INVALID:
 	default:
 		return "INVALID";

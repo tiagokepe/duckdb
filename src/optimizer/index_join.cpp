@@ -18,7 +18,7 @@ using namespace std;
 unique_ptr<LogicalOperator> IndexJoin::Optimize(unique_ptr<LogicalOperator> op) {
 	// We need to check if the current node is a Join and if either the left side or the right side is a get
 	if (op->type == LogicalOperatorType::COMPARISON_JOIN &&
-	    (op->children[0]->type == LogicalOperatorType::GET || op->children[1]->type == LogicalOperatorType::GET)) {
+	    (op->children[0]->type == LogicalOperatorType::GET && op->children[1]->type == LogicalOperatorType::GET)) {
 		return TransformJoinToIndexJoin(move(op));
 	}
 	for (auto &child : op->children) {

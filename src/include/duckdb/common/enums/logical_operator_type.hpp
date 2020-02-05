@@ -37,6 +37,7 @@ enum class LogicalOperatorType : uint8_t {
 	EXPRESSION_GET,
 	TABLE_FUNCTION,
 	EMPTY_RESULT,
+	CTE_REF,
 	// -----------------------------
 	// Joins
 	// -----------------------------
@@ -52,7 +53,8 @@ enum class LogicalOperatorType : uint8_t {
 	UNION,
 	EXCEPT,
 	INTERSECT,
-
+    RECURSIVE_CTE,
+    
 	// -----------------------------
 	// Updates
 	// -----------------------------
