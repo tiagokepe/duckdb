@@ -66,15 +66,15 @@ setMethod("dbSendQuery", c("duckdb_connection", "character"),
               cat("Q ", statement, "\n")
             }
 		    statement <- enc2utf8(statement)
-            resultset <- .Call(duckdb_query_R, conn@conn_ref, statement)
-            attr(resultset, "row.names") <-
-              c(NA_integer_, as.integer(-1 * length(resultset[[1]])))
-            class(resultset) <- "data.frame"
+            stmt_ref <- .Call(duckdb_prepare_R, conn@conn_ref, statement)
+            # attr(resultset, "row.names") <-
+            #   c(NA_integer_, as.integer(-1 * length(resultset[[1]])))
+            # class(resultset) <- "data.frame"
             duckdb_result(
               connection = conn,
               statement = statement,
-              has_resultset = TRUE,
-              resultset = resultset
+              stmt_ref=stmt_ref,
+              has_resultset = TRUE
             )
           })
 
@@ -87,7 +87,7 @@ setMethod("dbSendStatement", c("duckdb_connection", "character"),
               cat("S ", statement, "\n")
             }
 		    statement <- enc2utf8(statement)
-            resultset <- .Call(duckdb_query_R, conn@conn_ref, statement)
+            result_ref <- .Call(duckdb_prepare_R, conn@conn_ref, statement)
             duckdb_result(
               connection = conn,
               statement = statement,
@@ -310,3 +310,4 @@ setMethod("dbRollback", "duckdb_connection",
             dbExecute(conn, SQL("ROLLBACK"))
             invisible(TRUE)
           })
+

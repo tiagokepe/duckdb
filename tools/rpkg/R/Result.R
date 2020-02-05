@@ -1,13 +1,12 @@
 #' @include Connection.R
 NULL
 
-duckdb_result <- function(connection, statement, has_resultset, resultset=data.frame(), rows_affected=0) {
-
+duckdb_result <- function(connection, stmt_ref, statement, has_resultset) {
   env <- new.env(parent=emptyenv())
   env$rows_fetched <- 0
   env$open <- TRUE
 
-  new("duckdb_result", connection = connection, statement = statement, has_resultset=has_resultset, resultset = resultset, rows_affected=rows_affected, env=env)
+  new("duckdb_result", connection = connection,  statement = statement, stmt_ref=stmt_ref, has_resultset=has_resultset,env=env)
 }
 
 #' @rdname DBI
@@ -17,6 +16,7 @@ setClass(
   contains = "DBIResult",
   slots = list(
     connection = "duckdb_connection",
+    stmt_ref = "externalptr",
     statement = "character",
     has_resultset = "logical",
     resultset = "data.frame",
@@ -33,7 +33,7 @@ setClass(
 setMethod(
   "show", "duckdb_result",
   function(object) {
-    cat(sprintf("<duckdb_result connection=%s statement='%s'>\n", extptr_str(object@connection@conn_ref), object@statement))
+    cat(sprintf("<duckdb_result %s statement='%s' connection=%s>\n", extptr_str(object@stmt_ref), object@statement, extptr_str(object@connection@conn_ref)))
   })
 
 #' @rdname DBI
@@ -84,6 +84,10 @@ setMethod(
       warning("Cannot fetch from statement result")
       return(data.frame())
     }
+
+    res@env$resultset <- .Call(duckdb_execute_fetch_R, res@stmt_ref)
+    print(res@env$resultset)
+
 
 # FIXME this is ugly
     if (n == 0) {
@@ -199,5 +203,9 @@ setMethod(
 setMethod(
   "dbBind", "duckdb_result",
   function(res, params, ...) {
+    if (!res@env$open) {
+      stop("result has already been cleared")
+    }
     testthat::skip("Not yet implemented: dbBind(Result)")
+
   })

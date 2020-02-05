@@ -112,7 +112,21 @@ static void AppendFactor(SEXP coldata, Vector &result, index_t row_idx, index_t 
 
 extern "C" {
 
-SEXP duckdb_query_R(SEXP connsexp, SEXP querysexp) {
+
+static SEXP duckdb_finalize_stmt_R(SEXP stmtsexp) {
+	if (TYPEOF(stmtsexp) != EXTPTRSXP) {
+		Rf_error("duckdb_finalize_stmt_R: Need external pointer parameter");
+	}
+	auto stmt = (PreparedStatement *)R_ExternalPtrAddr(stmtsexp);
+	if (stmt) {
+		R_ClearExternalPtr(stmtsexp);
+		delete stmt;
+	}
+	return R_NilValue;
+}
+
+
+SEXP duckdb_prepare_R(SEXP connsexp, SEXP querysexp) {
 	if (TYPEOF(querysexp) != STRSXP || LENGTH(querysexp) != 1) {
 		Rf_error("duckdb_query_R: Need single string parameter for query");
 	}
@@ -132,13 +146,34 @@ SEXP duckdb_query_R(SEXP connsexp, SEXP querysexp) {
 
 	// step 1: run query
 	// need materialized result because we need a count for the R data frame :/
-	auto result = conn->Query(query);
+	auto stmt = conn->Prepare(query);
 
-	if (!result->success) {
-		Rf_error("duckdb_query_R: Failed to run query %s\nError: %s", query, result->error.c_str());
+	if (!stmt->success) {
+		Rf_error("duckdb_query_R: Failed to prepare query %s\nError: %s", query, stmt->error.c_str());
 	}
 
-	// step 2: create result data frame and allocate columns
+	SEXP stmtsexp = PROTECT(R_MakeExternalPtr(stmt.get(), R_NilValue, R_NilValue));
+	R_RegisterCFinalizer(stmtsexp, (void (*)(SEXP))duckdb_finalize_stmt_R);
+	UNPROTECT(1);
+	return stmtsexp;
+}
+
+
+SEXP duckdb_execute_fetch_R(SEXP stmtsexp) {
+	if (TYPEOF(stmtsexp) != EXTPTRSXP) {
+		Rf_error("duckdb_execute_fetch_R: Need external pointer parameter for statement");
+	}
+
+	auto stmt = (PreparedStatement *)R_ExternalPtrAddr(stmtsexp);
+	if (!stmt) {
+		Rf_error("duckdb_execute_fetch_R: Invalid statement");
+	}
+
+	vector<Value> params;
+	auto raw_result = stmt->Execute(params, false);
+	auto result = (MaterializedQueryResult*) raw_result.get();
+
+
 	uint32_t ncols = result->types.size();
 	uint64_t nrows = result->collection.count;
 
@@ -190,8 +225,8 @@ SEXP duckdb_query_R(SEXP connsexp, SEXP querysexp) {
 			default:
 				UNPROTECT(1); // retlist
 				Rf_error("duckdb_query_R: Unknown column type %s/%s",
-				         SQLTypeToString(result->sql_types[col_idx]).c_str(),
-				         TypeIdToString(result->types[col_idx]).c_str());
+						 SQLTypeToString(result->sql_types[col_idx]).c_str(),
+						 TypeIdToString(result->types[col_idx]).c_str());
 			}
 			if (!varvalue) {
 				UNPROTECT(2); // varvalue, retlist
@@ -223,11 +258,11 @@ SEXP duckdb_query_R(SEXP connsexp, SEXP querysexp) {
 					break;
 				case SQLTypeId::SMALLINT:
 					vector_to_r<int16_t, uint32_t>(chunk->data[col_idx], INTEGER_POINTER(dest), dest_offset,
-					                               NA_INTEGER);
+												   NA_INTEGER);
 					break;
 				case SQLTypeId::INTEGER:
 					vector_to_r<int32_t, uint32_t>(chunk->data[col_idx], INTEGER_POINTER(dest), dest_offset,
-					                               NA_INTEGER);
+												   NA_INTEGER);
 					break;
 				case SQLTypeId::TIMESTAMP: {
 					auto &src_vec = chunk->data[col_idx];
@@ -235,7 +270,7 @@ SEXP duckdb_query_R(SEXP connsexp, SEXP querysexp) {
 					double *dest_ptr = ((double *)NUMERIC_POINTER(dest)) + dest_offset;
 					for (size_t row_idx = 0; row_idx < src_vec.count; row_idx++) {
 						dest_ptr[row_idx] =
-						    src_vec.nullmask[row_idx] ? NA_REAL : (double)Timestamp::GetEpoch(src_data[row_idx]);
+							src_vec.nullmask[row_idx] ? NA_REAL : (double)Timestamp::GetEpoch(src_data[row_idx]);
 					}
 
 					// some dresssup for R
@@ -308,7 +343,7 @@ SEXP duckdb_query_R(SEXP connsexp, SEXP querysexp) {
 				}
 				default:
 					Rf_error("duckdb_query_R: Unknown column type %s",
-					         TypeIdToString(chunk->GetTypes()[col_idx]).c_str());
+							 TypeIdToString(chunk->GetTypes()[col_idx]).c_str());
 					break;
 				}
 			}
@@ -321,6 +356,8 @@ SEXP duckdb_query_R(SEXP connsexp, SEXP querysexp) {
 	}
 	return ScalarReal(0); // no need for protection because no allocation can happen afterwards
 }
+
+
 
 static SEXP duckdb_finalize_database_R(SEXP dbsexp) {
 	if (TYPEOF(dbsexp) != EXTPTRSXP) {
@@ -523,7 +560,8 @@ SEXP duckdb_ptr_to_str(SEXP extptr) {
 	{ #name, (DL_FUNC)&name, n }
 static const R_CallMethodDef R_CallDef[] = {CALLDEF(duckdb_startup_R, 2),
                                             CALLDEF(duckdb_connect_R, 1),
-                                            CALLDEF(duckdb_query_R, 2),
+                                            CALLDEF(duckdb_prepare_R, 2),
+                                            CALLDEF(duckdb_execute_fetch_R, 1),
                                             CALLDEF(duckdb_append_R, 3),
                                             CALLDEF(duckdb_disconnect_R, 1),
                                             CALLDEF(duckdb_shutdown_R, 1),

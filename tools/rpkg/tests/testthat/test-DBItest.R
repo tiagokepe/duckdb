@@ -1,4 +1,4 @@
-DBItest::make_context(duckdb::duckdb(), list(debug=F), tweaks = DBItest::tweaks(omit_blob_tests=TRUE, temporary_tables=FALSE, timestamp_cast = function(x) sprintf("CAST('%s' AS TIMESTAMP)", x), date_cast = function(x) sprintf("CAST('%s' AS DATE)", x), time_cast = function(x) sprintf("CAST('%s' AS TIME)", x)), name = "duckdb")
+DBItest::make_context(duckdb::duckdb(), list(debug=F), tweaks = DBItest::tweaks(omit_blob_tests=TRUE, timestamp_cast = function(x) sprintf("CAST('%s' AS TIMESTAMP)", x), date_cast = function(x) sprintf("CAST('%s' AS DATE)", x), time_cast = function(x) sprintf("CAST('%s' AS TIME)", x)), name = "duckdb")
 
 DBItest::test_all(c(
 	"package_name", # wontfix
@@ -27,7 +27,7 @@ DBItest::test_all(c(
 	"data_64_bit_lossless",  # not now,
 	"roundtrip_64_bit_character",
 	"roundtrip_64_bit_numeric",
-	"roundtrip_numeric_special",
+	"roundtrip_numeric_special", # old
 
 	"begin_write_commit",
 	"remove_table_other_con",
@@ -37,7 +37,6 @@ DBItest::test_all(c(
 	"connect_bigint_integer",
 	"connect_bigint_character",
 	"connect_bigint_integer64",
-	"create_table_overwrite",
 	"append_table_return",
 	"append_table_append_incompatible",
 	"append_roundtrip_keywords",
