@@ -107,6 +107,16 @@ int sqlite3_shutdown(void) {
 	return SQLITE_OK;
 }
 
+int sqlite3_prepare(
+  sqlite3 *db,            /* Database handle */
+  const char *zSql,       /* SQL statement, UTF-8 encoded */
+  int nByte,              /* Maximum length of zSql in bytes. */
+  sqlite3_stmt **ppStmt,  /* OUT: Statement handle */
+  const char **pzTail     /* OUT: Pointer to unused portion of zSql */
+) {
+	return sqlite3_prepare_v2(db, zSql, nByte, ppStmt, pzTail);
+}
+
 /* In SQLite this function compiles the query into VDBE bytecode,
  * in the implementation it currently executes the query */
 // TODO: prepare the statement instead of executing right away
@@ -818,7 +828,44 @@ int sqlite3_busy_timeout(sqlite3 *, int ms) {
 	return -1;
 }
 
+int sqlite3_busy_handler(
+  sqlite3 *db,
+  int (*xBusy)(void*,int),
+  void *pArg
+){
+	fprintf(stderr, "sqlite3_busy_handler: unsupported.\n");
+	return -1; // whatever
+}
+
+sqlite_int64 sqlite3_last_insert_rowid(sqlite3 *db){
+	fprintf(stderr, "sqlite3_last_insert_rowid: unsupported.\n");
+	return -1;
+}
+
+
 // unlikely to be supported
+
+ int sqlite3_get_table(
+  sqlite3 *db,          /* An open database */
+  const char *zSql,     /* SQL to be evaluated */
+  char ***pazResult,    /* Results of the query */
+  int *pnRow,           /* Number of result rows written here */
+  int *pnColumn,        /* Number of result columns written here */
+  char **pzErrmsg       /* Error msg written here */
+) {
+	fprintf(stderr, "sqlite3_get_table: unsupported.\n");
+	 return -1;
+}
+void sqlite3_free_table(char **result) {
+	fprintf(stderr, "sqlite3_free_table: unsupported.\n");
+
+}
+
+
+void *sqlite3_trace(sqlite3 *db, void(*xTrace)(void*,const char*), void *pArg){
+	fprintf(stderr, "sqlite3_trace: unsupported.\n");
+	return nullptr;
+}
 
 int sqlite3_trace_v2(sqlite3 *, unsigned uMask, int (*xCallback)(unsigned, void *, void *, void *), void *pCtx) {
 	fprintf(stderr, "sqlite3_trace_v2: unsupported.\n");
