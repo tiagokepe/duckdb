@@ -784,8 +784,10 @@ int sqlite3_table_column_metadata(sqlite3 *db,             /* Connection handle 
 }
 
 const char *sqlite3_column_decltype(sqlite3_stmt *stmt, int col) {
-	fprintf(stderr, "sqlite3_column_decltype: unsupported.\n");
-	return nullptr;
+	if (!stmt) {
+		return NULL;
+	}
+	return SQLTypeToString(stmt->prepared->types[col]).c_str();
 }
 
 int sqlite3_status64(int op, sqlite3_int64 *pCurrent, sqlite3_int64 *pHighwater, int resetFlag) {
