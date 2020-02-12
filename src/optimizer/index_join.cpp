@@ -1,8 +1,7 @@
 #include "duckdb/optimizer/index_join.hpp"
+
 #include "duckdb/optimizer/matcher/expression_matcher.hpp"
-
 #include "duckdb/parser/expression/comparison_expression.hpp"
-
 #include "duckdb/planner/expression/bound_columnref_expression.hpp"
 #include "duckdb/planner/expression/bound_comparison_expression.hpp"
 #include "duckdb/planner/expression/bound_constant_expression.hpp"
@@ -10,7 +9,6 @@
 #include "duckdb/planner/operator/logical_filter.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
 #include "duckdb/planner/operator/logical_index_join.hpp"
-
 #include "duckdb/storage/data_table.hpp"
 using namespace duckdb;
 using namespace std;
@@ -33,7 +31,7 @@ unique_ptr<LogicalOperator> IndexJoin::Optimize(unique_ptr<LogicalOperator> op) 
 unique_ptr<LogicalOperator> IndexJoin::TransformJoinToIndexJoin(unique_ptr<LogicalOperator> op) {
 	assert(op->type == LogicalOperatorType::COMPARISON_JOIN);
 	auto &join = (LogicalComparisonJoin &)*op;
-	auto get = (LogicalGet *)op->children[0].get();
+	auto get = (LogicalGet *)op->children[1].get();
 
 	if (!get->table) {
 		return op;
@@ -67,10 +65,8 @@ unique_ptr<LogicalOperator> IndexJoin::TransformJoinToIndexJoin(unique_ptr<Logic
 		Value low_value, high_value, equal_value;
 		// try to find a matching index for any of the filter expressions
 
-		// FIXME: Right now I only check the LHS for the join key
-        //FIXME: Might need to swap conditions in the optimizer
-
-        auto expr = (BoundColumnRefExpression *)join.conditions[0].left.get();
+		// FIXME: Right now I only check the RHS for the join key
+        auto expr = (BoundColumnRefExpression *)join.conditions[0].right.get();
 		auto idx_bindings = (BoundColumnRefExpression *)index_expression.get();
 		// Its a match
 		if (expr->binding.table_index == idx_bindings->binding.table_index &&
@@ -78,7 +74,7 @@ unique_ptr<LogicalOperator> IndexJoin::TransformJoinToIndexJoin(unique_ptr<Logic
 			auto logical_index_join = make_unique<LogicalIndexJoin>(
 			    join.join_type, join.left_projection_map, join.right_projection_map,join.conditions, *get->table, *get->table->storage,
 			    *index, get->column_ids, get->table_index);
-			logical_index_join->children.push_back(move(join.children[1]));
+			logical_index_join->children.push_back(move(join.children[0]));
 			op = move(logical_index_join);
 		}
 		return op;

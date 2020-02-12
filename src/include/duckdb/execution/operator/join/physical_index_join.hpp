@@ -10,6 +10,9 @@
 
 #include "duckdb/common/types/chunk_collection.hpp"
 #include "duckdb/execution/operator/join/physical_comparison_join.hpp"
+#include "duckdb/execution/physical_operator.hpp"
+#include "duckdb/storage/data_table.hpp"
+#include "duckdb/storage/index.hpp"
 
 namespace duckdb {
 

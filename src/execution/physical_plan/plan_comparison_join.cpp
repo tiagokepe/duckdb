@@ -1,10 +1,9 @@
 #include "duckdb/execution/operator/join/physical_cross_product.hpp"
 #include "duckdb/execution/operator/join/physical_hash_join.hpp"
-#include "duckdb/execution/operator/join/physical_nested_loop_join.hpp"
 #include "duckdb/execution/operator/join/physical_piecewise_merge_join.hpp"
 #include "duckdb/execution/physical_plan_generator.hpp"
 #include "duckdb/planner/operator/logical_comparison_join.hpp"
-
+#include "duckdb/execution/operator/join/physical_blockwise_nl_join.hpp"
 using namespace duckdb;
 using namespace std;
 
@@ -50,7 +49,7 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalComparison
 			    make_unique<PhysicalPiecewiseMergeJoin>(op, move(left), move(right), move(op.conditions), op.join_type);
 		} else {
 			// inequality join: use nested loop
-			plan = make_unique<PhysicalNestedLoopJoin>(op, move(left), move(right), move(op.conditions), op.join_type);
+            plan = make_unique<PhysicalBlockwiseNLJoin>(op, move(left), move(right), move(op.conditions), op.join_type);
 		}
 	}
 	return plan;

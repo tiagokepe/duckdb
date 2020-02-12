@@ -2,7 +2,7 @@
 
 #include "duckdb/common/vector_operations/vector_operations.hpp"
 #include "duckdb/execution/expression_executor.hpp"
-
+#include "duckdb/planner/expression/bound_conjunction_expression.hpp"
 using namespace duckdb;
 using namespace std;
 
@@ -36,6 +36,29 @@ PhysicalBlockwiseNLJoin::PhysicalBlockwiseNLJoin(LogicalOperator &op, unique_ptr
 	assert(join_type != JoinType::MARK);
 	assert(join_type != JoinType::RIGHT);
 	assert(join_type != JoinType::SINGLE);
+}
+
+PhysicalBlockwiseNLJoin::PhysicalBlockwiseNLJoin(LogicalOperator &op, unique_ptr<PhysicalOperator> left,
+                                                 unique_ptr<PhysicalOperator> right, vector<JoinCondition> cond,
+                                                 JoinType join_type)
+    : PhysicalJoin(op, PhysicalOperatorType::BLOCKWISE_NL_JOIN, join_type) {
+    if (cond.size() == 1){
+        condition = JoinCondition::CreateExpression(move(cond[0]));
+    }
+    else{
+        auto bound_cond = make_unique<BoundConjunctionExpression>(ExpressionType::CONJUNCTION_AND);
+        for (auto& condition : cond) {
+            bound_cond->children.push_back((JoinCondition::CreateExpression(move(condition))));
+        }
+        condition = move(bound_cond);
+    }
+
+    children.push_back(move(left));
+    children.push_back(move(right));
+    // MARK, SINGLE and RIGHT OUTER joins not handled
+    assert(join_type != JoinType::MARK);
+    assert(join_type != JoinType::RIGHT);
+    assert(join_type != JoinType::SINGLE);
 }
 
 void PhysicalBlockwiseNLJoin::GetChunkInternal(ClientContext &context, DataChunk &chunk,
