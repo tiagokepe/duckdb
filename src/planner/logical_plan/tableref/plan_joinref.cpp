@@ -99,8 +99,17 @@ unique_ptr<LogicalOperator> LogicalComparisonJoin::CreateJoin(JoinType type, uni
 		}
 		arbitrary_expressions.push_back(move(expr));
 	}
-	if (conditions.size() > 0) {
-		// we successfully convertedexpressions into JoinConditions
+    // we check if any of the conditions is a COMPARE_NOTEQUAL
+    // if yes we must always create an ANY_JOIN and create a Blockwise NLJ
+    bool inequality_join = false;
+    for (const auto&cond: conditions){
+        if (cond.comparison == ExpressionType::COMPARE_NOTEQUAL){
+            inequality_join = true;
+        }
+    }
+
+	if (conditions.size() > 0 && !inequality_join) {
+		// we successfully converted expressions into JoinConditions
 		// create a LogicalComparisonJoin
 		auto comp_join = make_unique<LogicalComparisonJoin>(type);
 		comp_join->conditions = move(conditions);
@@ -136,6 +145,11 @@ unique_ptr<LogicalOperator> LogicalComparisonJoin::CreateJoin(JoinType type, uni
 			any_join->condition = make_unique<BoundConjunctionExpression>(
 			    ExpressionType::CONJUNCTION_AND, move(any_join->condition), move(arbitrary_expressions[i]));
 		}
+		// now push the conditions
+        for (auto&cond: conditions) {
+            any_join->condition = make_unique<BoundConjunctionExpression>(
+                ExpressionType::CONJUNCTION_AND, move(any_join->condition), JoinCondition::CreateExpression(move(cond)));
+        }
 		return move(any_join);
 	}
 }

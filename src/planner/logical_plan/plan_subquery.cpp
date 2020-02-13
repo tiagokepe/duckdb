@@ -108,23 +108,32 @@ static unique_ptr<Expression> PlanUncorrelatedSubquery(Binder &binder, BoundSubq
 		// subquery has no NULL values -> result is (TRUE, FALSE or NULL [if input is NULL])
 		// fetch the column bindings
 		auto plan_columns = plan->GetColumnBindings();
+        // Generate the MARK join with the subquery
+        index_t mark_index = binder.GenerateTableIndex();
+        // create the JOIN condition
+        JoinCondition cond;
+        cond.left = move(expr.child);
+        cond.right = BoundCastExpression::AddCastToType(
+            make_unique<BoundColumnRefExpression>(GetInternalType(expr.child_type), plan_columns[0]), expr.child_type,
+            expr.child_target);
+        cond.comparison = expr.comparison_type;
+		// Create Logical ANY Join
+        if (expr.comparison_type == ExpressionType::COMPARE_NOTEQUAL){
 
-		// then we generate the MARK join with the subquery
-		index_t mark_index = binder.GenerateTableIndex();
-		auto join = make_unique<LogicalComparisonJoin>(JoinType::MARK);
-		join->mark_index = mark_index;
-		join->AddChild(move(root));
-		join->AddChild(move(plan));
-		// create the JOIN condition
-		JoinCondition cond;
-		cond.left = move(expr.child);
-		cond.right = BoundCastExpression::AddCastToType(
-		    make_unique<BoundColumnRefExpression>(GetInternalType(expr.child_type), plan_columns[0]), expr.child_type,
-		    expr.child_target);
-		cond.comparison = expr.comparison_type;
-		join->conditions.push_back(move(cond));
-		root = move(join);
-
+            auto join = make_unique<LogicalComparisonJoin>(JoinType::MARK);
+            join->mark_index = mark_index;
+            join->AddChild(move(root));
+            join->AddChild(move(plan));
+            join->conditions.push_back(move(cond));
+            root = move(join);
+        } else{ 		// Create Comparison Join
+            auto any_join = make_unique<LogicalAnyJoin>(JoinType::MARK);
+            any_join->mark_index = mark_index;
+            any_join->AddChild(move(root));
+            any_join->AddChild(move(plan));
+            any_join->condition = JoinCondition::CreateExpression(move(cond));
+            root = move(any_join);
+        }
 		// we replace the original subquery with a BoundColumnRefExpression refering to the mark column
 		return make_unique<BoundColumnRefExpression>(expr.GetName(), expr.return_type, ColumnBinding(mark_index, 0));
 	}
