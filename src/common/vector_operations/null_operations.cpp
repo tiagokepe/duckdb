@@ -13,15 +13,21 @@ using namespace std;
 template <bool INVERSE> void is_null_loop(Vector &input, Vector &result) {
 	assert(result.type == TypeId::BOOL);
 
-	result.vector_type = input.vector_type;
-	result.nullmask.reset();
+    result.nullmask.reset();
+    result.sel_vector = input.sel_vector;
+    result.count = input.count;
 
-	auto result_data = (bool *)result.GetData();
+    auto result_data = (bool *)result.GetData();
+	if (input.vector_type == VectorType::CONSTANT_VECTOR) {
+	    result.vector_type = VectorType::CONSTANT_VECTOR;
+	    result_data[0] = INVERSE ? !input.nullmask[0] : input.nullmask[0];
+	    return;
+	}
+	input.Normalify();
+    result.vector_type = VectorType::FLAT_VECTOR;
 	VectorOperations::Exec(input.sel_vector, input.count, [&](index_t i, index_t k) {
 		result_data[i] = INVERSE ? !input.nullmask[i] : input.nullmask[i];
 	});
-	result.sel_vector = input.sel_vector;
-	result.count = input.count;
 }
 
 void VectorOperations::IsNotNull(Vector &input, Vector &result) {
