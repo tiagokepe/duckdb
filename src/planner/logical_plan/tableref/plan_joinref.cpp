@@ -102,13 +102,18 @@ unique_ptr<LogicalOperator> LogicalComparisonJoin::CreateJoin(JoinType type, uni
     // we check if any of the conditions is a COMPARE_NOTEQUAL
     // if yes we must always create an ANY_JOIN and create a Blockwise NLJ
     bool inequality_join = false;
+    bool has_equality = false;
+
     for (const auto&cond: conditions){
         if (cond.comparison == ExpressionType::COMPARE_NOTEQUAL){
             inequality_join = true;
         }
+        if (cond.comparison == ExpressionType::COMPARE_EQUAL){
+            has_equality = true;
+        }
     }
 
-	if (conditions.size() > 0 && !inequality_join) {
+	if (!inequality_join && ((conditions.size() > 0 && has_equality) || (conditions.size() == 1))) {
 		// we successfully converted expressions into JoinConditions
 		// create a LogicalComparisonJoin
 		auto comp_join = make_unique<LogicalComparisonJoin>(type);

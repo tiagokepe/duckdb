@@ -106,10 +106,10 @@ unique_ptr<LogicalOperator> Optimizer::Optimize(unique_ptr<LogicalOperator> plan
 
 	// Now we check if there are any equality joins + scan with indexes in their RHS key
 	// if yes we rewrite it to a index_join node.
-	context.profiler.StartPhase("index_join");
-	IndexJoin index_join;
-	plan = index_join.Optimize(move(plan));
-	context.profiler.EndPhase();
+//	context.profiler.StartPhase("index_join");
+//	IndexJoin index_join;
+//	plan = index_join.Optimize(move(plan));
+//	context.profiler.EndPhase();
 
 	// then we extract common subexpressions inside the different operators
 	// context.profiler.StartPhase("common_subexpressions");

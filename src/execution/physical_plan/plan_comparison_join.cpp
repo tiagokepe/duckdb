@@ -48,7 +48,7 @@ unique_ptr<PhysicalOperator> PhysicalPlanGenerator::CreatePlan(LogicalComparison
 			plan =
 			    make_unique<PhysicalPiecewiseMergeJoin>(op, move(left), move(right), move(op.conditions), op.join_type);
 		} else {
-            // inequality join: should never be a comparison join. It should be transformed to ANY JOIN and then converted to blockwiseNLJoin
+            // It should be transformed to ANY JOIN and then converted to BlockwiseNLJoin
 		    assert(0);
 		}
 	}

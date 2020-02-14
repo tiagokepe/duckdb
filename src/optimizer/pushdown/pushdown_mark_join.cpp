@@ -12,10 +12,15 @@ unique_ptr<LogicalOperator> FilterPushdown::PushdownMarkJoin(unique_ptr<LogicalO
                                                              unordered_set<index_t> &right_bindings) {
 	auto &join = (LogicalJoin &)*op;
 	auto &comp_join = (LogicalComparisonJoin &)*op;
+    auto &any_join = (LogicalAnyJoin &)*op;
 	assert(join.join_type == JoinType::MARK);
 	assert(op->type == LogicalOperatorType::COMPARISON_JOIN || op->type == LogicalOperatorType::DELIM_JOIN || op->type == LogicalOperatorType::ANY_JOIN );
-
-	right_bindings.insert(comp_join.mark_index);
+	if (join.type == LogicalOperatorType::ANY_JOIN){
+        right_bindings.insert(any_join.mark_index);
+	}
+	else{
+        right_bindings.insert(comp_join.mark_index);
+	}
 	FilterPushdown left_pushdown(optimizer), right_pushdown(optimizer);
 	bool found_mark_reference = false;
 	// now check the set of filters
@@ -49,12 +54,15 @@ unique_ptr<LogicalOperator> FilterPushdown::PushdownMarkJoin(unique_ptr<LogicalO
 				if (op_expr.children[0]->type == ExpressionType::BOUND_COLUMN_REF) {
 					// the filter is NOT(marker), check the join conditions
 					bool all_null_values_are_equal = true;
-					for (auto &cond : comp_join.conditions) {
-						if (!cond.null_values_are_equal) {
-							all_null_values_are_equal = false;
-							break;
-						}
-					}
+                    if (join.type != LogicalOperatorType::ANY_JOIN){
+                        for (auto &cond : comp_join.conditions) {
+                            if (!cond.null_values_are_equal) {
+                                all_null_values_are_equal = false;
+                                break;
+                            }
+                        }
+                    }
+
 					if (all_null_values_are_equal) {
 						// all null values are equal, convert to ANTI join
 						join.join_type = JoinType::ANTI;
