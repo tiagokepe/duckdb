@@ -1,6 +1,7 @@
 #include "duckdb/optimizer/statistics_propagator.hpp"
 #include "duckdb/planner/filter/conjunction_filter.hpp"
 #include "duckdb/planner/filter/constant_filter.hpp"
+#include "duckdb/planner/filter/null_filter.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
 #include "duckdb/planner/table_filter.hpp"
 
@@ -20,9 +21,24 @@ void StatisticsPropagator::UpdateFilterStatistics(BaseStatistics &input, TableFi
 		}
 		break;
 	}
+	case TableFilterType::CONJUNCTION_OR: {
+		auto &conjunction_or = (ConjunctionOrFilter &)filter;
+		for (auto &child_filter : conjunction_or.child_filters) {
+			UpdateFilterStatistics(input, *child_filter);
+		}
+		break;
+	}
 	case TableFilterType::CONSTANT_COMPARISON: {
 		auto &constant_filter = (ConstantFilter &)filter;
 		UpdateFilterStatistics(input, constant_filter.comparison_type, constant_filter.constant);
+		break;
+	}
+	case TableFilterType::IS_NULL: {
+		input.validity_stats = make_unique<ValidityStatistics>(true);
+		if (input.type.IsNumeric()) {
+			auto &num_stats =  (NumericStatistics &)input;
+			num_stats.min = Value::MinimumValue(LogicalTypeId::SQLNULL);
+		}
 		break;
 	}
 	default:
@@ -84,6 +100,11 @@ unique_ptr<NodeStatistics> StatisticsPropagator::PropagateStatistics(LogicalGet 
 			break;
 		case FilterPropagateResult::FILTER_FALSE_OR_NULL:
 		case FilterPropagateResult::FILTER_ALWAYS_FALSE:
+			// filter is always false; As it is an OR filter, we can erase it, but we need to check the others
+			if (filter->filter_type == TableFilterType::CONJUNCTION_OR) {
+				get.table_filters.filters.erase(table_filter_column);
+				break;
+			}
 			// filter is always false; this entire filter should be replaced by an empty result block
 			ReplaceWithEmptyResult(*node_ptr);
 			return make_unique<NodeStatistics>(0, 0);

@@ -18,6 +18,7 @@ bool StandardColumnData::CheckZonemap(ColumnScanState &state, TableFilter &filte
 			return true;
 		}
 		state.segment_checked = true;
+		// TODO retuning always_false in ConjunctionOrFilter (NullFilter)
 		auto prune_result = filter.CheckStatistics(*state.current->stats.statistics);
 		if (prune_result != FilterPropagateResult::FILTER_ALWAYS_FALSE) {
 			return true;

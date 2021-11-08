@@ -22,6 +22,8 @@ bool BaseStatistics::CanHaveNull() {
 		// solid maybe
 		return true;
 	}
+	// auto v_stats = (ValidityStatistics &)*validity_stats;
+	auto res = ((ValidityStatistics &)*validity_stats).has_null;
 	return ((ValidityStatistics &)*validity_stats).has_null;
 }
 

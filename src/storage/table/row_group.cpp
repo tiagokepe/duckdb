@@ -100,6 +100,7 @@ bool RowGroup::InitializeScan(RowGroupScanState &state) {
 		auto column = column_ids[i];
 		if (column != COLUMN_IDENTIFIER_ROW_ID) {
 			columns[column]->InitializeScan(state.column_scans[i]);
+			//state.column_scans[i]->current.stats = *stats[i]->statistics
 		} else {
 			state.column_scans[i].current = nullptr;
 		}
@@ -235,6 +236,9 @@ bool RowGroup::CheckZonemap(TableFilterSet &filters, const vector<column_t> &col
 		auto column_index = entry.first;
 		auto &filter = entry.second;
 		auto base_column_index = column_ids[column_index];
+		if (base_column_index == COLUMN_IDENTIFIER_ROW_ID) {
+			continue;
+		}
 
 		auto propagate_result = filter->CheckStatistics(*stats[base_column_index]->statistics);
 		if (propagate_result == FilterPropagateResult::FILTER_ALWAYS_FALSE ||
@@ -254,6 +258,9 @@ bool RowGroup::CheckZonemapSegments(RowGroupScanState &state) {
 		D_ASSERT(entry.first < column_ids.size());
 		auto column_idx = entry.first;
 		auto base_column_idx = column_ids[column_idx];
+		if (base_column_idx == COLUMN_IDENTIFIER_ROW_ID) {
+			continue;
+		}
 		bool read_segment = columns[base_column_idx]->CheckZonemap(state.column_scans[column_idx], *entry.second);
 		if (!read_segment) {
 			idx_t target_row =
@@ -297,6 +304,7 @@ void RowGroup::TemplatedScan(Transaction *transaction, RowGroupScanState &state,
 
 		//! first check the zonemap if we have to scan this partition
 		if (!CheckZonemapSegments(state)) {
+			//! TODO disabled for now
 			continue;
 		}
 		// second, scan the version chunk manager to figure out which tuples to load for this transaction
@@ -360,6 +368,10 @@ void RowGroup::TemplatedScan(Transaction *transaction, RowGroupScanState &state,
 				for (idx_t i = 0; i < table_filters->filters.size(); i++) {
 					auto tf_idx = adaptive_filter->permutation[i];
 					auto col_idx = column_ids[tf_idx];
+					if (col_idx == COLUMN_IDENTIFIER_ROW_ID) {
+						continue;
+					}
+					// TODO for OR filters we need to split the selection vector and approved_tuple_count
 					columns[col_idx]->Select(*transaction, state.vector_index, state.column_scans[tf_idx],
 					                         result.data[tf_idx], sel, approved_tuple_count,
 					                         *table_filters->filters[tf_idx]);

@@ -15,6 +15,7 @@
 #include "duckdb/planner/filter/null_filter.hpp"
 
 #include "duckdb/common/operator/cast_operators.hpp"
+#include "duckdb/planner/filter/conjunction_filter.hpp"
 
 namespace duckdb {
 
@@ -379,6 +380,131 @@ bool FilterCombiner::HasFilters() {
 // 	return zonemap_checks;
 // }
 
+// static void SetOrFilterChildren(Expression &expression) {
+// 	if (expression.expression_class == ExpressionClass::BOUND_COMPARISON) {
+// 	}
+// }
+
+// static void GetOrBindings(Expression &expression, unordered_set<idx_t> &bindings) {
+// 	if (expression.type == ExpressionType::BOUND_COLUMN_REF) {
+// 		auto &colref = (BoundColumnRefExpression &)expression;
+// 		bindings.insert(colref.binding.column_index);
+// 	}
+// 	ExpressionIterator::EnumerateChildren(expression, [&](Expression &child) {
+// 		GetOrBindings(child, bindings);
+// 	});
+// }
+
+// static void GetOrBindings(Expression &expression, unordered_set<idx_t> &bindings) {
+// 	if (expression.expression_class == ExpressionClass::BOUND_COMPARISON) {
+// 		ExpressionIterator::EnumerateChildren(expression, [&](Expression &child) {
+// 			if (child.type == ExpressionType::BOUND_COLUMN_REF) {
+// 				auto &colref = (BoundColumnRefExpression &)child;
+// 				bindings.insert(colref.binding.column_index);
+// 			}
+// 		});
+// 	}
+// }
+
+// static unique_ptr<TableFilter> GetConstantFilter(const Expression &col_expr, const Expression &constant, idx_t
+// &col_idx) { 	auto &colref = (BoundColumnRefExpression &)col_expr; 	col_idx = colref.binding.column_index; 	auto
+// constant_value = ExpressionExecutor::EvaluateScalar(*constant); 	auto constant_filter =
+// make_unique<ConstantFilter>(comp_expr.type, constant_value); 	return move(constant_filter);
+
+// }
+
+// static unique_ptr<ConstantFilter> GetConstantFilter(const Expression &expression, idx_t &col_idx) {
+// 	if (expression.expression_class == ExpressionClass::BOUND_COMPARISON) {
+// 		auto &comp_expr = (BoundComparisonExpression &)expression;
+// 		using func_const_filter_t = std::function<unique_ptr<ConstantFilter>(const Expression &, const Expression &)>;
+// 		func_const_filter_t func_create_const_filter = [&](const Expression &col_expr,
+// 		                                                   const Expression &const_expr) -> unique_ptr<ConstantFilter> {
+// 			auto &colref = (BoundColumnRefExpression &)col_expr;
+// 			col_idx = colref.binding.column_index;
+// 			auto constant_value = ExpressionExecutor::EvaluateScalar(const_expr);
+// 			// auto constant_filter = make_unique<ConstantFilter>(comp_expr.type, constant_value);
+// 			return make_unique<ConstantFilter>(comp_expr.type, constant_value);
+// 		};
+
+// 		if (comp_expr.left->type == ExpressionType::BOUND_COLUMN_REF &&
+// 		    comp_expr.right->type == ExpressionType::VALUE_CONSTANT) {
+// 			return func_create_const_filter(*comp_expr.left, *comp_expr.right);
+// 		}
+// 		if (comp_expr.right->type == ExpressionType::BOUND_COLUMN_REF &&
+// 		    comp_expr.left->type == ExpressionType::VALUE_CONSTANT) {
+// 			return func_create_const_filter(*comp_expr.right, *comp_expr.left);
+// 			// auto &colref = (BoundColumnRefExpression &)comp_expr.right;
+// 			// col_idx = colref.binding.column_index;
+
+// 			// auto constant_value = ExpressionExecutor::EvaluateScalar(*comp_expr.left.get());
+// 			// auto constant_filter = make_unique<ConstantFilter>(comp_expr.type, constant_value);
+// 			// return move(constant_filter);
+// 		}
+// 	}
+// 	return nullptr;
+// }
+
+static bool AddOrFilter(const Expression &expression, std::unordered_map<idx_t, unique_ptr<ConjunctionOrFilter>> &map_idx_orfilter) {
+	if (expression.expression_class == ExpressionClass::BOUND_COMPARISON) {
+		auto &comp_expr = (BoundComparisonExpression &)expression;
+		using func_const_filter_t = std::function<bool(const Expression &, const Expression &)>;
+		func_const_filter_t func_create_const_filter = [&](const Expression &col_expr,
+		                                                   const Expression &const_expr) -> bool {
+			auto &column_ref = (BoundColumnRefExpression &)col_expr;
+			auto col_idx = column_ref.binding.column_index;
+
+			auto entry = map_idx_orfilter.find(col_idx);
+			if (entry == map_idx_orfilter.end()) {
+				map_idx_orfilter.insert(std::make_pair(col_idx, make_unique<ConjunctionOrFilter>()));
+				entry = map_idx_orfilter.find(col_idx);
+			}
+			auto constant_value = ExpressionExecutor::EvaluateScalar(const_expr);
+			auto constant_filter = make_unique<ConstantFilter>(comp_expr.type, constant_value);
+			entry->second->child_filters.push_back(move(constant_filter));
+			return true;
+		};
+
+		if (comp_expr.left->type == ExpressionType::BOUND_COLUMN_REF &&
+		    comp_expr.right->type == ExpressionType::VALUE_CONSTANT) {
+			return func_create_const_filter(*comp_expr.left, *comp_expr.right);
+		}
+		if (comp_expr.right->type == ExpressionType::BOUND_COLUMN_REF &&
+		    comp_expr.left->type == ExpressionType::VALUE_CONSTANT) {
+			return func_create_const_filter(*comp_expr.right, *comp_expr.left);
+		}
+	} else if (expression.expression_class == ExpressionClass::BOUND_OPERATOR) {
+		if (expression.type == ExpressionType::OPERATOR_IS_NULL || expression.type == ExpressionType::OPERATOR_IS_NOT_NULL) {
+			bool ret = true;
+			auto &op_expr = (BoundOperatorExpression &)expression;
+			for(auto &child: op_expr.children) {
+				if (child->type == ExpressionType::BOUND_COLUMN_REF) {
+					// auto child_ptr = (BoundColumnRefExpression *) child.get();
+					auto &colref = (BoundColumnRefExpression &)*child;
+					// auto b = colref.binding;
+					auto col_idx = colref.binding.column_index;
+					auto entry = map_idx_orfilter.find(col_idx);
+					if (entry == map_idx_orfilter.end()) {
+						map_idx_orfilter.insert(std::make_pair(col_idx, make_unique<ConjunctionOrFilter>()));
+						entry = map_idx_orfilter.find(col_idx);
+					}
+					if (expression.type == ExpressionType::OPERATOR_IS_NULL) {
+						entry->second->child_filters.push_back(move(make_unique<IsNullFilter>()));
+					} else {
+						entry->second->child_filters.push_back(move(make_unique<IsNotNullFilter>()));
+					}
+				} else {
+					// we can't discart a child expresion that is not a BoundColumnRefExpression
+					// it's needed to keep it in the ramaining filters
+					ret = false;
+				}
+			}
+			return ret;
+			// return false;
+		}
+	}
+	return false;
+}
+
 TableFilterSet FilterCombiner::GenerateTableScanFilters(vector<idx_t> &column_ids) {
 	TableFilterSet table_filters;
 	//! First, we figure the filters that have constant expressions that we can push down to the table scan
@@ -547,6 +673,53 @@ TableFilterSet FilterCombiner::GenerateTableScanFilters(vector<idx_t> &column_id
 			table_filters.PushFilter(column_index, make_unique<IsNotNullFilter>());
 
 			remaining_filters.erase(remaining_filters.begin() + rem_fil_idx);
+
+		}
+		else if (remaining_filter->type == ExpressionType::CONJUNCTION_OR) {
+			auto &or_conjunction = (BoundConjunctionExpression &)*remaining_filter;
+			std::unordered_map<idx_t, unique_ptr<ConjunctionOrFilter>> map_idx_orfilter;
+			bool can_remove_filter = true;
+			for (idx_t i = 0; i < or_conjunction.children.size(); i++) {
+				auto &child = (Expression &)*or_conjunction.children[i];
+				// case AddConstantFilter() return false, we cannot remove the filter
+				can_remove_filter &= AddOrFilter(child, map_idx_orfilter);
+			}
+			for (auto entry = map_idx_orfilter.begin(); entry != map_idx_orfilter.end(); ++entry) {
+				table_filters.PushFilter(column_ids[entry->first], move(entry->second));
+			}
+			if (can_remove_filter) {
+				remaining_filters.erase(remaining_filters.begin() + rem_fil_idx);
+			}
+			// }
+			// 	auto &child = (Expression &)*or_conjunction.children[i];
+			// 	idx_t bound_col_idx;
+			// 	auto const_filter = GetConstantFilter(child, bound_col_idx);
+			// 	if (const_filter) {
+			// 		auto entry = map_idx_constfilter.find(bound_col_idx);
+			// 		if (entry == map_idx_constfilter.end()) {
+			// 			// vector<unique_ptr<ConstantFilter>> vec_constfilter;// = {move(const_filter)};
+			// 			// vec_constfilter.push_back(move(const_filter));
+			// 			std::pair<idx_t, vector<unique_ptr<ConstantFilter>>> new_entry(
+			// 			    bound_col_idx, vector<unique_ptr<ConstantFilter>>());
+			// 			map_idx_constfilter.insert(new_entry);
+			// 		} else {
+			// 			entry->second.push_back(move(const_filter));
+			// 		}
+			// 	}
+			// }
+			// for (auto entry = map_idx_constfilter.begin(); entry != map_idx_constfilter.end(); ++entry) {
+			// 	if (entry->second.size() > 1) {
+			// 		auto or_filter = make_unique<ConjunctionOrFilter>();
+
+			// 		auto &constant_filters = entry->second;
+			// 		auto &children = (vector<unique_ptr<TableFilter>> &)or_filter->child_filters;
+
+			// 		for (idx_t i = 0; i < constant_filters.size(); ++i) {
+			// 			children.push_back(move(constant_filters[i]));
+			// 		}
+			// 		table_filters.PushFilter(entry->first, move(or_filter));
+			// 	}
+			// }
 		}
 	}
 
@@ -606,6 +779,7 @@ FilterResult FilterCombiner::AddBoundComparisonFilter(Expression *expr) {
 			}
 		}
 		return ret;
+
 	} else {
 		// comparison between two non-scalars
 		// only handle comparisons for now
@@ -715,6 +889,8 @@ FilterResult FilterCombiner::AddFilter(Expression *expr) {
 		}
 	} else if (expr->GetExpressionClass() == ExpressionClass::BOUND_COMPARISON) {
 		return AddBoundComparisonFilter(expr);
+	} else if (expr->type == ExpressionType::CONJUNCTION_OR) {
+		LogicalFilter::OrPredicate((BoundConjunctionExpression *)expr);
 	}
 	// only comparisons supported for now
 	return FilterResult::UNSUPPORTED;

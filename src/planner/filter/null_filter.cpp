@@ -7,6 +7,7 @@ IsNullFilter::IsNullFilter() : TableFilter(TableFilterType::IS_NULL) {
 }
 
 FilterPropagateResult IsNullFilter::CheckStatistics(BaseStatistics &stats) {
+	// TODO is returning FILTER_ALWAYS_FALSE even for chunks wiht NULL values
 	if (!stats.CanHaveNull()) {
 		// no null values are possible: always false
 		return FilterPropagateResult::FILTER_ALWAYS_FALSE;
