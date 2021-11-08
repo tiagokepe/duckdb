@@ -9,6 +9,7 @@
 #pragma once
 
 #include "duckdb/planner/logical_operator.hpp"
+#include <unordered_map>
 
 namespace duckdb {
 
@@ -30,8 +31,13 @@ public:
 	//! separated by AND Returns whether or not any splits were made
 	static bool SplitPredicates(vector<unique_ptr<Expression>> &expressions);
 
+	static void OrPredicate(BoundConjunctionExpression *conjunction);
+
 protected:
 	void ResolveTypes() override;
+
+private:
+	// unordered_map<> or_map;
 };
 
 } // namespace duckdb
