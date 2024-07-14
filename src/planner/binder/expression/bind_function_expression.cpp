@@ -185,13 +185,17 @@ BindResult ExpressionBinder::BindFunction(FunctionExpression &function, ScalarFu
 		}
 		auto result_type = GetResultCollation(bound_function);
 		if (bound_function.return_type.id() == LogicalTypeId::VARCHAR && StringType::IsCollated(result_type)) {
-				if(StringType::IsCollated(bound_function.return_type) && bound_function.return_type != result_type) {
-						throw BinderException(function, "Function \"%s\" has multiple collations: %s and %s",
-												function.function_name, StringType::GetCollation(bound_function.return_type),
-																	StringType::GetCollation(result_type));
-				}
-				// propagating result child collation to function result
-				bound_function.return_type = result_type;
+			if(StringType::IsCollated(bound_function.return_type) && bound_function.return_type != result_type) {
+					throw BinderException(function, "Function \"%s\" has multiple collations: %s and %s",
+											function.function_name, StringType::GetCollation(bound_function.return_type),
+																StringType::GetCollation(result_type));
+			}
+			// propagating result child collation to function result
+			bound_function.return_type = result_type;
+		}
+		if (IsSelectBinder(this)) {
+			SelectBinder *select_binder = dynamic_cast<SelectBinder *>(this);
+			select_binder->FinishBindFunction(function, bound_function);
 		}
 	}
 	return BindResult(std::move(result));

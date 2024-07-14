@@ -50,8 +50,8 @@ BindResult BaseSelectBinder::BindExpression(unique_ptr<ParsedExpression> &expr_p
 		return BindColumnRef(expr_ptr, depth, root_expression);
 	case ExpressionClass::DEFAULT:
 		return BindResult("SELECT clause cannot contain DEFAULT clause");
-	case ExpressionClass::FUNCTION:
-		return BindFunction(expr_ptr, depth, root_expression);
+	// case ExpressionClass::FUNCTION:
+	// 	return BindFunction(expr_ptr, depth, root_expression);
 	case ExpressionClass::WINDOW:
 		return BindWindow(expr.Cast<WindowExpression>(), depth);
 	default:
@@ -102,6 +102,22 @@ bool BaseSelectBinder::CanPushCollation(ParsedExpression &expr, LogicalType retu
 		return true;
 	default:
 		return IsExtraOrderbyEntry(expr);
+	}
+}
+
+void BaseSelectBinder::FinishBindFunction(ParsedExpression &function, BoundFunctionExpression &bound_function) {
+	auto result_type = GetResultCollation(bound_function);
+	bool can_push_collation = CanPushCollation(function, bound_function.return_type);
+	if (can_push_collation) {
+		for (auto &child: bound_function.children) {
+			if (child->return_type.id() == LogicalTypeId::VARCHAR) {
+				ExpressionBinder::PushCollation(context, child, result_type, false);
+			}
+		}
+	}
+	// propagating result child collation to function result type
+	if (bound_function.return_type.id() == LogicalTypeId::VARCHAR) {
+		bound_function.return_type = result_type;
 	}
 }
 

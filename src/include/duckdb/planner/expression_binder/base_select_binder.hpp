@@ -40,6 +40,7 @@ public:
 
 	bool IsExtraOrderbyEntry(ParsedExpression &expr);
 	bool CanPushCollation(ParsedExpression &expr, LogicalType return_type);
+	void FinishBindFunction(ParsedExpression &expr_ptr, BoundFunctionExpression &bound_funtion);
 
 protected:
 	BindResult BindExpression(unique_ptr<ParsedExpression> &expr_ptr, idx_t depth,
