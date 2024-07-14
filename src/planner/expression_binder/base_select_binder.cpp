@@ -50,6 +50,8 @@ BindResult BaseSelectBinder::BindExpression(unique_ptr<ParsedExpression> &expr_p
 		return BindColumnRef(expr_ptr, depth, root_expression);
 	case ExpressionClass::DEFAULT:
 		return BindResult("SELECT clause cannot contain DEFAULT clause");
+	case ExpressionClass::FUNCTION:
+		return BindFunction(expr_ptr, depth, root_expression);
 	case ExpressionClass::WINDOW:
 		return BindWindow(expr.Cast<WindowExpression>(), depth);
 	default:
@@ -86,6 +88,43 @@ idx_t BaseSelectBinder::TryBindGroup(ParsedExpression &expr) {
 
 BindResult BaseSelectBinder::BindColumnRef(unique_ptr<ParsedExpression> &expr_ptr, idx_t depth, bool root_expression) {
 	return ExpressionBinder::BindExpression(expr_ptr, depth);
+}
+
+bool BaseSelectBinder::IsExtraOrderbyEntry(ParsedExpression &expr) {
+	// true if expr is an extra entry added to the select list from the OrderBinder
+	return (node.bind_state.orderby_select_entry.find(expr) != node.bind_state.orderby_select_entry.end());
+}
+
+bool BaseSelectBinder::CanPushCollation(ParsedExpression &expr, LogicalType return_type) {
+	switch (return_type.id()) {
+	case LogicalTypeId::BOOLEAN:
+		// we can push collation when the function result type is BOOLEAN
+		return true;
+	default:
+		return IsExtraOrderbyEntry(expr);
+	}
+}
+
+BindResult BaseSelectBinder::BindFunction(unique_ptr<ParsedExpression> &expr_ptr, idx_t depth, bool root_expression) {
+	D_ASSERT(expr_ptr->expression_class == ExpressionClass::FUNCTION);
+	auto bound_result = ExpressionBinder::BindExpression(expr_ptr, depth, root_expression);
+	auto &bound_function = bound_result.expression->Cast<BoundFunctionExpression>();
+
+	auto result_type = GetResultCollation(bound_function);
+	bool can_push_collation = CanPushCollation(*expr_ptr, bound_function.return_type);
+	if (can_push_collation) {
+		for (auto &child: bound_function.children) {
+			if (child->return_type.id() == LogicalTypeId::VARCHAR) {
+				ExpressionBinder::PushCollation(context, child, result_type, false);
+				// child->return_type = result_type;
+			}
+		}
+	}
+	// propagating result child collation to function result type
+	if (bound_function.return_type.id() == LogicalTypeId::VARCHAR) {
+		bound_function.return_type = result_type;
+	}
+	return bound_result;
 }
 
 BindResult BaseSelectBinder::BindGroupingFunction(OperatorExpression &op, idx_t depth) {

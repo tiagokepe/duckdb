@@ -38,6 +38,9 @@ public:
 		this->bound_columns.clear();
 	}
 
+	bool IsExtraOrderbyEntry(ParsedExpression &expr);
+	bool CanPushCollation(ParsedExpression &expr, LogicalType return_type);
+
 protected:
 	BindResult BindExpression(unique_ptr<ParsedExpression> &expr_ptr, idx_t depth,
 	                          bool root_expression = false) override;
@@ -56,6 +59,8 @@ protected:
 	//! Binds a WINDOW expression and returns the result.
 	virtual BindResult BindWindow(WindowExpression &expr, idx_t depth);
 	virtual BindResult BindColumnRef(unique_ptr<ParsedExpression> &expr_ptr, idx_t depth, bool root_expression);
+
+	virtual BindResult BindFunction(unique_ptr<ParsedExpression> &expr_ptr, idx_t depth, bool root_expression);
 
 	idx_t TryBindGroup(ParsedExpression &expr);
 	BindResult BindGroup(ParsedExpression &expr, idx_t depth, idx_t group_index);

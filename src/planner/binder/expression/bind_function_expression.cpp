@@ -13,9 +13,10 @@
 #include "duckdb/planner/expression/bound_lambda_expression.hpp"
 #include "duckdb/planner/expression/bound_reference_expression.hpp"
 #include "duckdb/planner/expression_binder.hpp"
+#include "duckdb/planner/expression_binder/insert_binder.hpp"
 #include "duckdb/planner/expression_binder/select_binder.hpp"
 #include "duckdb/planner/expression_binder/group_binder.hpp"
-
+#include "duckdb/planner/expression_binder/order_binder.hpp"
 
 namespace duckdb {
 
@@ -106,6 +107,14 @@ BindResult ExpressionBinder::BindExpression(FunctionExpression &function, idx_t 
 	}
 }
 
+static bool IsOrderBinder(ExpressionBinder *binder) {
+	return nullptr != dynamic_cast<OrderBinder *>(binder);
+}
+
+static bool IsInsertBinder(ExpressionBinder *binder) {
+	return nullptr != dynamic_cast<InsertBinder *>(binder);
+}
+
 static bool IsGroupBinder(ExpressionBinder *binder) {
 	return nullptr != dynamic_cast<GroupBinder *>(binder);
 }
@@ -125,7 +134,7 @@ static bool NotSkippedLikeFunction(const string &function_name) {
 }
 
 static bool CanPushCollation(ExpressionBinder *binder, FunctionExpression &function) {
-	if (IsGroupBinder(binder)) {
+	if (IsGroupBinder(binder) || IsInsertBinder(binder) || IsOrderBinder(binder)) {
 		// not push collation in GroupBinder, the SelectBinder will do
 		return false;
 	}
@@ -140,10 +149,9 @@ static bool CanPushCollation(ExpressionBinder *binder, FunctionExpression &funct
 }
 
 BindResult ExpressionBinder::BindFunction(FunctionExpression &function, ScalarFunctionCatalogEntry &func, idx_t depth) {
-	bool push_collation = CanPushCollation(this, function);
-
 	// bind the children of the function expression
 	ErrorData error;
+
 	// bind of each child
 	for (idx_t i = 0; i < function.children.size(); i++) {
 		BindChild(function.children[i], depth, error);
@@ -172,36 +180,18 @@ BindResult ExpressionBinder::BindFunction(FunctionExpression &function, ScalarFu
 	}
 	if (result->type == ExpressionType::BOUND_FUNCTION) {
 		auto &bound_function = result->Cast<BoundFunctionExpression>();
-
-		auto children_res_type = GetResultCollation(bound_function);
-		bool is_skipped_like = SkippedLikeFunction(function.function_name);
-		if (push_collation && StringType::IsCollated(children_res_type)) {
-			for (auto &child: bound_function.children) {
-				if (child->return_type.id() == LogicalTypeId::VARCHAR) {
-					if (!is_skipped_like) {
-						ExpressionBinder::PushCollation(context, child, children_res_type, false);
-					} else {
-						child->return_type = children_res_type;
-					}
-				}
-			}
-		}
-
 		if (bound_function.function.stability == FunctionStability::CONSISTENT_WITHIN_QUERY) {
 			binder.SetAlwaysRequireRebind();
 		}
-		if (bound_function.return_type.id() == LogicalTypeId::VARCHAR && StringType::IsCollated(children_res_type)) {
-			if(StringType::IsCollated(bound_function.return_type) && bound_function.return_type != children_res_type) {
-				throw BinderException(function, "Function \"%s\" has multiple collations: %s and %s",
-				                      function.function_name, StringType::GetCollation(bound_function.return_type),
-									  StringType::GetCollation(children_res_type));
-			}
-			// propagating result child collation to function result
-			bound_function.return_type = children_res_type;
-			// not SelectBinder, we should push collation
-			if (push_collation) {
-				ExpressionBinder::PushCollation(context, result, children_res_type, false);
-			}
+		auto result_type = GetResultCollation(bound_function);
+		if (bound_function.return_type.id() == LogicalTypeId::VARCHAR && StringType::IsCollated(result_type)) {
+				if(StringType::IsCollated(bound_function.return_type) && bound_function.return_type != result_type) {
+						throw BinderException(function, "Function \"%s\" has multiple collations: %s and %s",
+												function.function_name, StringType::GetCollation(bound_function.return_type),
+																	StringType::GetCollation(result_type));
+				}
+				// propagating result child collation to function result
+				bound_function.return_type = result_type;
 		}
 	}
 	return BindResult(std::move(result));

@@ -426,7 +426,7 @@ A
 query I
 SELECT 'Abbbb' COLLATE NOCASE ^@ 'a'
 ----
-false
+true
 
 
 ######### !!! test ends_with
@@ -434,19 +434,19 @@ false
 query I
 SELECT ends_with('aaaaB' COLLATE NOCASE, 'b')
 ----
-false
+true
 
 query II
 SELECT a, ends_with(a COLLATE NOACCENT, 'o') FROM tbl
 ----
-ö	false
+ö	true
 o	true
 p	false
 
 query II
 SELECT a, ends_with(a, 'ö' COLLATE NOACCENT) FROM tbl ORDER BY a
 ----
-o	false
+o	true
 p	false
 ö	true
 
@@ -491,18 +491,18 @@ p|p
 query I
 SELECT contains('abbbb', 'A' COLLATE NOCASE)
 ----
-false
+true
 
 query I
 SELECT contains('Abbbb' COLLATE NOCASE, 'a')
 ----
-false
+true
 
 
 query I
 SELECT contains(a COLLATE NOACCENT, 'o') FROM tbl
 ----
-false
+true
 true
 false
 
@@ -896,7 +896,7 @@ false
 query I
 SELECT regexp_full_match('hellö_world' COLLATE NOACCENT, '[a-z]+_[a-z]+')
 ----
-false
+true
 
 query I
 SELECT regexp_full_match('hellö_world', '[a-zö]+_[a-z]+')
@@ -941,7 +941,7 @@ false
 query I
 SELECT regexp_matches('hellö_world' COLLATE NOACCENT, '[a-z]+_[a-z]+')
 ----
-false
+true
 
 query I
 SELECT regexp_matches('hellö_world', '[a-zö]+_[a-z]+')
