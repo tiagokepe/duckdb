@@ -97,10 +97,12 @@ BindResult BaseSelectBinder::BindGroupingFunction(OperatorExpression &op, idx_t 
 }
 
 BindResult BaseSelectBinder::BindGroup(ParsedExpression &expr, idx_t depth, idx_t group_index) {
-	auto it = info.collated_groups.find(group_index);
-	if (it != info.collated_groups.end()) {
+	auto subquery_entry = node.groups.collated_subquery_group.find(group_index);
+	auto collated_group_entry = info.collated_groups.find(group_index);
+
+	if (collated_group_entry != info.collated_groups.end()) {
 		// This is an implicitly collated group, so we need to refer to the first() aggregate
-		const auto &aggr_index = it->second;
+		const auto &aggr_index = collated_group_entry->second;
 		auto uncollated_first_expression =
 		    make_uniq<BoundColumnRefExpression>(expr.GetName(), node.aggregates[aggr_index]->return_type,
 		                                        ColumnBinding(node.aggregate_index, aggr_index), depth);
@@ -124,7 +126,15 @@ BindResult BaseSelectBinder::BindGroup(ParsedExpression &expr, idx_t depth, idx_
 		auto else_expr = std::move(uncollated_first_expression);
 		auto case_expr =
 		    make_uniq<BoundCaseExpression>(std::move(when_expr), std::move(then_expr), std::move(else_expr));
+
 		return BindResult(std::move(case_expr));
+
+	} else if (subquery_entry != node.groups.collated_subquery_group.end()) {
+		const auto &aggr_index = subquery_entry->second;
+		auto subquery_first_expression = make_uniq<BoundColumnRefExpression>(
+		    expr.GetName(), LogicalType::VARCHAR, ColumnBinding(node.aggregate_index, aggr_index), depth);
+		return BindResult(std::move(subquery_first_expression));
+
 	} else {
 		auto &group = node.groups.group_expressions[group_index];
 		return BindResult(make_uniq<BoundColumnRefExpression>(expr.GetName(), group->return_type,

@@ -2,6 +2,8 @@
 # description: Test collate statement over a subquery
 # group: [collate]
 
+require ICU
+
 statement ok
 PRAGMA enable_verification
 
@@ -20,3 +22,14 @@ query I
 select (select c1 from t0) collate nocase='xxx';
 ----
 true
+
+
+query I
+SELECT (select c1 COLLATE DE FROM t0) AS y FROM t0 GROUP BY y
+----
+XXX
+
+query II
+SELECT any_value(c1) AS c1, (select c1 COLLATE NOCASE FROM t0) AS y FROM t0 GROUP BY y
+----
+XXX	XXX

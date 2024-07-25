@@ -1,5 +1,6 @@
 #include "duckdb/planner/binder.hpp"
 #include "duckdb/planner/expression/bound_columnref_expression.hpp"
+#include "duckdb/planner/expression/bound_function_expression.hpp"
 #include "duckdb/planner/expression/bound_reference_expression.hpp"
 #include "duckdb/planner/operator/list.hpp"
 #include "duckdb/planner/operator/logical_dummy_scan.hpp"
@@ -13,6 +14,25 @@ unique_ptr<LogicalOperator> Binder::PlanFilter(unique_ptr<Expression> condition,
 	auto filter = make_uniq<LogicalFilter>(std::move(condition));
 	filter->AddChild(std::move(root));
 	return std::move(filter);
+}
+
+void Binder::PlanCollatedSubquery(BoundSelectNode &statement, unique_ptr<Expression> &group, idx_t group_idx) {
+	auto entry = statement.groups.collated_subquery_group.find(group_idx);
+	if (entry != statement.groups.collated_subquery_group.end()) {
+		D_ASSERT(group->expression_class == ExpressionClass::BOUND_FUNCTION);
+		auto &func_expr = group->Cast<BoundFunctionExpression>();
+
+		D_ASSERT(!func_expr.children.empty());
+		auto &child = func_expr.children[0];
+
+		auto first_fun = FirstFun::GetFunction(LogicalType::VARCHAR);
+		vector<unique_ptr<Expression>> first_children;
+		first_children.push_back(child->Copy());
+
+		FunctionBinder function_binder(context);
+		auto function = function_binder.BindAggregateFunction(first_fun, std::move(first_children));
+		statement.aggregates.push_back(std::move(function));
+	}
 }
 
 unique_ptr<LogicalOperator> Binder::CreatePlan(BoundSelectNode &statement) {
@@ -33,8 +53,10 @@ unique_ptr<LogicalOperator> Binder::CreatePlan(BoundSelectNode &statement) {
 	if (!statement.aggregates.empty() || !statement.groups.group_expressions.empty()) {
 		if (!statement.groups.group_expressions.empty()) {
 			// visit the groups
-			for (auto &group : statement.groups.group_expressions) {
+			for (idx_t group_idx = 0; group_idx < statement.groups.group_expressions.size(); group_idx++) {
+				auto &group = statement.groups.group_expressions[group_idx];
 				PlanSubqueries(group, root);
+				PlanCollatedSubquery(statement, group, group_idx);
 			}
 		}
 		// now visit all aggregate expressions

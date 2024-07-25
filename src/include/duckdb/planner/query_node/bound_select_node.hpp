@@ -24,6 +24,10 @@ public:
 	vector<unique_ptr<Expression>> group_expressions;
 	//! The different grouping sets as they map to the group expressions
 	vector<GroupingSet> grouping_sets;
+
+	//! Group set of collated subquery results
+	//! Useful when GROUP BY references a column in a subquery
+	unordered_map<idx_t, idx_t> collated_subquery_group;
 };
 
 struct BoundUnnestNode {
