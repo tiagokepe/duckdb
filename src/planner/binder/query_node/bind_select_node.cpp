@@ -494,7 +494,7 @@ unique_ptr<BoundQueryNode> Binder::BindSelectNode(SelectNode &statement, unique_
 				FunctionBinder function_binder(context);
 				auto function = function_binder.BindAggregateFunction(first_fun, std::move(first_children));
 				result->aggregates.push_back(std::move(function));
-			} else if (contains_subquery) {
+			} else if (contains_subquery && requires_collation) {
 				result->groups.collated_subquery_group[i] = result->aggregates.size();
 			}
 			result->groups.group_expressions.push_back(std::move(bound_expr));
