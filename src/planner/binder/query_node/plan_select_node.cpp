@@ -6,6 +6,8 @@
 #include "duckdb/planner/operator/logical_dummy_scan.hpp"
 #include "duckdb/planner/operator/logical_limit.hpp"
 #include "duckdb/planner/query_node/bound_select_node.hpp"
+#include "duckdb/function/aggregate/distributive_functions.hpp"
+#include "duckdb/function/function_binder.hpp"
 
 namespace duckdb {
 
